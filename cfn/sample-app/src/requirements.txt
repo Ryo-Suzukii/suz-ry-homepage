@@ -1,0 +1,4 @@
+# Add your Lambda function dependencies here
+# Example:
+# requests==2.28.1
+# boto3==1.26.0
