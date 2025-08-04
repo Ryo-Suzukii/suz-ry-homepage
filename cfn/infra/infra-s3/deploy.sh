@@ -67,30 +67,61 @@ fi
 
 ENVIRONMENT_NAME=$(jq -r '.EnvironmentName' "$SETTING_FILE")
 
+# Validate JSON value
+if [ -z "$ENVIRONMENT_NAME" ] || [ "$ENVIRONMENT_NAME" = "null" ]; then
+    echo "Error: Invalid EnvironmentName in setting.json"
+    exit 1
+fi
+
 # Determine AWS profile
 if [ -n "$CUSTOM_PROFILE" ]; then
-    # Use custom profile if provided
     PROFILE_TO_USE="$CUSTOM_PROFILE"
 elif [ -n "$AWS_PROFILE" ]; then
-    # Use AWS_PROFILE environment variable if set
     PROFILE_TO_USE="$AWS_PROFILE"
 else
-    # Default to hoge_{environment} pattern
     PROFILE_TO_USE="hoge_${ENVIRONMENT}"
 fi
 
-echo "Deploying $APP_NAME to $ENVIRONMENT environment..."
+echo "Deploying S3 infrastructure for $ENVIRONMENT environment..."
 echo "AWS Profile: $PROFILE_TO_USE"
 echo "Environment Name: $ENVIRONMENT_NAME"
+echo "Stack Name: ${APP_NAME}-${ENVIRONMENT}"
 
-# Deploy using SAM
-sam deploy \
+# Deploy CloudFormation stack
+aws cloudformation deploy \
     --profile "$PROFILE_TO_USE" \
+    --template-file template.yaml \
+    --stack-name "${APP_NAME}-${ENVIRONMENT}" \
     --parameter-overrides \
         EnvironmentName="$ENVIRONMENT_NAME" \
         AppName="$APP_NAME" \
-    --stack-name "${APP_NAME}-${ENVIRONMENT}" \
     --capabilities CAPABILITY_IAM \
-    --resolve-s3
+    --tags \
+        Environment="$ENVIRONMENT_NAME" \
+        Purpose=S3Storage \
+        ManagedBy=CloudFormation
 
-echo "Deployment completed successfully!"
+echo "S3 infrastructure deployment completed successfully!"
+
+# Display stack outputs
+echo ""
+echo "=== S3 Infrastructure Outputs ==="
+aws cloudformation describe-stacks \
+    --profile "$PROFILE_TO_USE" \
+    --stack-name "${APP_NAME}-${ENVIRONMENT}" \
+    --query 'Stacks[0].Outputs[].{Key:OutputKey,Value:OutputValue,Description:Description}' \
+    --output table
+
+echo ""
+echo "=== Usage Instructions ==="
+echo "These S3 buckets can be used by other stacks by referencing the exported values:"
+echo ""
+echo "CloudFormation Import Examples:"
+echo "  LambdaLayerBucket: !ImportValue ${APP_NAME}-${ENVIRONMENT}-LambdaLayerBucketName"
+echo "  CodePipelineBucket: !ImportValue ${APP_NAME}-${ENVIRONMENT}-CodePipelineBucketName"
+echo "  CloudFormationBucket: !ImportValue ${APP_NAME}-${ENVIRONMENT}-CloudFormationBucketName"
+echo "  ApplicationDataBucket: !ImportValue ${APP_NAME}-${ENVIRONMENT}-ApplicationDataBucketName"
+echo ""
+echo "AWS CLI Examples:"
+echo "  LAMBDA_BUCKET=\$(aws cloudformation describe-stacks --stack-name ${APP_NAME}-${ENVIRONMENT} --query 'Stacks[0].Outputs[?OutputKey==\`LambdaLayerBucketName\`].OutputValue' --output text --profile $PROFILE_TO_USE)"
+echo "  PIPELINE_BUCKET=\$(aws cloudformation describe-stacks --stack-name ${APP_NAME}-${ENVIRONMENT} --query 'Stacks[0].Outputs[?OutputKey==\`CodePipelineBucketName\`].OutputValue' --output text --profile $PROFILE_TO_USE)"

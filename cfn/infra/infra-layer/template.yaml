@@ -1,0 +1,74 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: 'Lambda Layer for common Python libraries'
+
+Parameters:
+  EnvironmentName:
+    Type: String
+    Description: Environment name (e.g., dev, prd)
+    Default: dev
+  
+  AppName:
+    Type: String
+    Description: Application name for layer
+    Default: infra-layer
+
+  PythonVersion:
+    Type: String
+    Description: Python runtime version
+    Default: python3.13
+    AllowedValues:
+      - python3.9
+      - python3.10
+      - python3.11
+      - python3.12
+      - python3.13
+
+  S3StackName:
+    Type: String
+    Description: Name of the S3 infrastructure stack
+    Default: infra-s3
+
+Resources:
+  # Lambda Layer for common libraries
+  # S3 Bucket and Key are provided by CodeBuild pipeline
+  CommonLibrariesLayer:
+    Type: AWS::Lambda::LayerVersion
+    Properties:
+      LayerName: !Sub "${AppName}-${EnvironmentName}-common-libraries"
+      Description: !Sub "Common Python libraries for ${EnvironmentName} environment (built by CodeBuild)"
+      Content:
+        S3Bucket: !ImportValue 
+          Fn::Sub: "${S3StackName}-${EnvironmentName}-LambdaLayerBucketName"
+        S3Key: "layers/common-libraries-latest.zip"
+      CompatibleRuntimes:
+        - !Ref PythonVersion
+      CompatibleArchitectures:
+        - x86_64
+      LicenseInfo: "Various open source licenses"
+
+Outputs:
+  LayerArnWithVersion:
+    Description: ARN of the common libraries Lambda Layer with version
+    Value: !Ref CommonLibrariesLayer
+    Export:
+      Name: !Sub "${AWS::StackName}-LayerArnWithVersion"
+
+  LayerName:
+    Description: Name of the common libraries Lambda Layer
+    Value: !Sub "${AppName}-${EnvironmentName}-common-libraries"
+    Export:
+      Name: !Sub "${AWS::StackName}-LayerName"
+
+  LayerS3Bucket:
+    Description: S3 bucket containing the layer package
+    Value: !ImportValue 
+      Fn::Sub: "${S3StackName}-${EnvironmentName}-LambdaLayerBucketName"
+    Export:
+      Name: !Sub "${AWS::StackName}-LayerS3Bucket"
+
+  LayerS3Key:
+    Description: S3 key for the layer package
+    Value: "layers/common-libraries-latest.zip"
+    Export:
+      Name: !Sub "${AWS::StackName}-LayerS3Key"

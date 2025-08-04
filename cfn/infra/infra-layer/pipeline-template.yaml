@@ -1,0 +1,485 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'CodePipeline and CodeBuild for Lambda Layer building'
+
+Parameters:
+  EnvironmentName:
+    Type: String
+    Description: Environment name (e.g., dev, prd)
+    Default: dev
+  
+  AppName:
+    Type: String
+    Description: Application name for pipeline
+    Default: infra-layer
+
+  PythonVersion:
+    Type: String
+    Description: Python runtime version
+    Default: python3.13
+    AllowedValues:
+      - python3.9
+      - python3.10
+      - python3.11
+      - python3.12
+      - python3.13
+
+  GitHubOwner:
+    Type: String
+    Description: GitHub repository owner
+    Default: ""
+
+  GitHubRepo:
+    Type: String
+    Description: GitHub repository name
+    Default: ""
+
+  GitHubBranch:
+    Type: String
+    Description: GitHub branch name
+    Default: main
+
+  GitHubToken:
+    Type: String
+    Description: GitHub personal access token (stored in Secrets Manager)
+    NoEcho: true
+    Default: ""
+
+  S3StackName:
+    Type: String
+    Description: Name of the S3 infrastructure stack
+    Default: infra-s3
+
+Conditions:
+  UseGitHub: !Not [!Equals [!Ref GitHubOwner, ""]]
+
+Resources:
+
+  # IAM Role for CodeBuild
+  CodeBuildServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${AppName}-${EnvironmentName}-codebuild-role"
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: codebuild.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: CodeBuildPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              # CloudWatch Logs
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/${AppName}-*"
+              
+              # S3 access for artifacts (using external S3 stack)
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                Resource:
+                  - !Sub 
+                    - "${CodePipelineBucketArn}/*"
+                    - CodePipelineBucketArn: !ImportValue 
+                        Fn::Sub: "${S3StackName}-${EnvironmentName}-CodePipelineBucketArn"
+                  - !Sub 
+                    - "${LambdaLayerBucketArn}/*"
+                    - LambdaLayerBucketArn: !ImportValue 
+                        Fn::Sub: "${S3StackName}-${EnvironmentName}-LambdaLayerBucketArn"
+              
+              - Effect: Allow
+                Action:
+                  - s3:ListBucket
+                Resource:
+                  - !ImportValue 
+                      Fn::Sub: "${S3StackName}-${EnvironmentName}-CodePipelineBucketArn"
+                  - !ImportValue 
+                      Fn::Sub: "${S3StackName}-${EnvironmentName}-LambdaLayerBucketArn"
+              
+              # Parameter Store access (if needed)
+              - Effect: Allow
+                Action:
+                  - ssm:GetParameter
+                  - ssm:GetParameters
+                Resource: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/lambda/layer/*"
+
+  # IAM Role for CodePipeline
+  CodePipelineServiceRole:
+    Type: AWS::IAM::Role
+    Condition: UseGitHub
+    Properties:
+      RoleName: !Sub "${AppName}-${EnvironmentName}-codepipeline-role"
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: codepipeline.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: CodePipelinePolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              # S3 access for artifacts (using external S3 stack)
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:GetBucketVersioning
+                Resource:
+                  - !ImportValue 
+                      Fn::Sub: "${S3StackName}-${EnvironmentName}-CodePipelineBucketArn"
+                  - !Sub 
+                    - "${CodePipelineBucketArn}/*"
+                    - CodePipelineBucketArn: !ImportValue 
+                        Fn::Sub: "${S3StackName}-${EnvironmentName}-CodePipelineBucketArn"
+              
+              # CodeBuild access
+              - Effect: Allow
+                Action:
+                  - codebuild:BatchGetBuilds
+                  - codebuild:StartBuild
+                Resource: 
+                  - !GetAtt CodeBuildProject.Arn
+                  - !If 
+                    - UseGitHub
+                    - !GetAtt CodeBuildPipelineProject.Arn
+                    - !Ref AWS::NoValue
+
+  # CodeBuild Project for manual builds
+  CodeBuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: !Sub "${AppName}-${EnvironmentName}-layer-builder"
+      Description: !Sub "Build Lambda Layer for ${EnvironmentName} environment (manual)"
+      ServiceRole: !GetAtt CodeBuildServiceRole.Arn
+      Artifacts:
+        Type: S3
+        Location: !ImportValue 
+          Fn::Sub: "${S3StackName}-${EnvironmentName}-CodePipelineBucketName"
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_MEDIUM
+        Image: aws/codebuild/amazonlinux2-x86_64-standard:5.0
+        EnvironmentVariables:
+          - Name: PYTHON_VERSION
+            Value: !Ref PythonVersion
+          - Name: LAYER_NAME
+            Value: common-libraries
+          - Name: LAYER_BUCKET
+            Value: !ImportValue 
+              Fn::Sub: "${S3StackName}-${EnvironmentName}-LambdaLayerBucketName"
+          - Name: ENVIRONMENT_NAME
+            Value: !Ref EnvironmentName
+      Source:
+        Type: S3
+        Location: !Sub 
+          - "${CodePipelineBucketName}/sources/"
+          - CodePipelineBucketName: !ImportValue 
+              Fn::Sub: "${S3StackName}-${EnvironmentName}-CodePipelineBucketName"
+        BuildSpec: |
+          version: 0.2
+          
+          env:
+            variables:
+              PYTHON_VERSION: "python3.13"
+              LAYER_NAME: "common-libraries"
+          
+          phases:
+            install:
+              runtime-versions:
+                python: "3.13"
+              commands:
+                - echo "Installing build dependencies..."
+                - python --version
+                - pip --version
+                
+            pre_build:
+              commands:
+                - echo "Pre-build phase started on `date`"
+                - echo "Validating requirements.txt..."
+                - |
+                  if [ ! -f requirements.txt ]; then
+                    echo "Error: requirements.txt not found"
+                    exit 1
+                  fi
+                - echo "Requirements file validated"
+                
+            build:
+              commands:
+                - echo "Build phase started on `date`"
+                - echo "Creating layer directory structure..."
+                
+                # Lambda Layer の標準ディレクトリ構造を作成
+                - mkdir -p build/python/lib/$PYTHON_VERSION/site-packages
+                
+                # 最新のpipに更新
+                - python -m pip install --upgrade pip
+                
+                # パッケージインストール（Lambda環境互換）
+                - echo "Installing Python packages for Lambda Layer..."
+                - |
+                  pip install \
+                    --platform manylinux2014_x86_64 \
+                    --target build/python/lib/$PYTHON_VERSION/site-packages \
+                    --implementation cp \
+                    --only-binary=:all: \
+                    --upgrade \
+                    -r requirements.txt
+                
+                # 不要なファイルを削除してサイズ削減
+                - echo "Cleaning up unnecessary files..."
+                - find build/python -name "*.pyc" -delete
+                - find build/python -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true
+                - find build/python -name "*.dist-info" -type d -exec rm -rf {} + 2>/dev/null || true
+                - find build/python -name "tests" -type d -exec rm -rf {} + 2>/dev/null || true
+                - find build/python -name "test" -type d -exec rm -rf {} + 2>/dev/null || true
+                
+                # ZIP圧縮
+                - echo "Creating layer ZIP file..."
+                - cd build
+                - zip -r ../layer-package.zip python/ -q
+                - cd ..
+                
+                # S3にアップロード
+                - echo "Uploading layer package to S3..."
+                - aws s3 cp layer-package.zip s3://$LAYER_BUCKET/layers/$LAYER_NAME-$(date +%Y%m%d-%H%M%S).zip
+                - aws s3 cp layer-package.zip s3://$LAYER_BUCKET/layers/$LAYER_NAME-latest.zip
+                
+                - echo "Build completed successfully!"
+                
+            post_build:
+              commands:
+                - echo "Post-build phase completed on `date`"
+          
+          artifacts:
+            files:
+              - layer-package.zip
+              - requirements.txt
+            name: lambda-layer-artifacts-$CODEBUILD_BUILD_NUMBER
+          
+          cache:
+            paths:
+              - '/root/.cache/pip/**/*'
+      TimeoutInMinutes: 30
+      Tags:
+        - Key: Environment
+          Value: !Ref EnvironmentName
+        - Key: Purpose
+          Value: LambdaLayerBuilder
+
+  # CodeBuild Project for pipeline builds
+  CodeBuildPipelineProject:
+    Type: AWS::CodeBuild::Project
+    Condition: UseGitHub
+    Properties:
+      Name: !Sub "${AppName}-${EnvironmentName}-pipeline-builder"
+      Description: !Sub "Build Lambda Layer for ${EnvironmentName} environment (pipeline)"
+      ServiceRole: !GetAtt CodeBuildServiceRole.Arn
+      Artifacts:
+        Type: CODEPIPELINE
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_MEDIUM
+        Image: aws/codebuild/amazonlinux2-x86_64-standard:5.0
+        EnvironmentVariables:
+          - Name: PYTHON_VERSION
+            Value: !Ref PythonVersion
+          - Name: LAYER_NAME
+            Value: common-libraries
+          - Name: LAYER_BUCKET
+            Value: !ImportValue 
+              Fn::Sub: "${S3StackName}-${EnvironmentName}-LambdaLayerBucketName"
+          - Name: ENVIRONMENT_NAME
+            Value: !Ref EnvironmentName
+      Source:
+        Type: CODEPIPELINE
+        BuildSpec: |
+          version: 0.2
+          
+          env:
+            variables:
+              PYTHON_VERSION: "python3.13"
+              LAYER_NAME: "common-libraries"
+          
+          phases:
+            install:
+              runtime-versions:
+                python: "3.13"
+              commands:
+                - echo "Installing build dependencies..."
+                - python --version
+                - pip --version
+                
+            pre_build:
+              commands:
+                - echo "Pre-build phase started on `date`"
+                - echo "Validating requirements.txt..."
+                - |
+                  if [ ! -f requirements.txt ]; then
+                    echo "Error: requirements.txt not found"
+                    exit 1
+                  fi
+                - echo "Requirements file validated"
+                
+            build:
+              commands:
+                - echo "Build phase started on `date`"
+                - echo "Creating layer directory structure..."
+                
+                # Lambda Layer の標準ディレクトリ構造を作成
+                - mkdir -p build/python/lib/$PYTHON_VERSION/site-packages
+                
+                # 最新のpipに更新
+                - python -m pip install --upgrade pip
+                
+                # パッケージインストール（Lambda環境互換）
+                - echo "Installing Python packages for Lambda Layer..."
+                - |
+                  pip install \
+                    --platform manylinux2014_x86_64 \
+                    --target build/python/lib/$PYTHON_VERSION/site-packages \
+                    --implementation cp \
+                    --only-binary=:all: \
+                    --upgrade \
+                    -r requirements.txt
+                
+                # 不要なファイルを削除してサイズ削減
+                - echo "Cleaning up unnecessary files..."
+                - find build/python -name "*.pyc" -delete
+                - find build/python -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true
+                - find build/python -name "*.dist-info" -type d -exec rm -rf {} + 2>/dev/null || true
+                - find build/python -name "tests" -type d -exec rm -rf {} + 2>/dev/null || true
+                - find build/python -name "test" -type d -exec rm -rf {} + 2>/dev/null || true
+                
+                # ZIP圧縮
+                - echo "Creating layer ZIP file..."
+                - cd build
+                - zip -r ../layer-package.zip python/ -q
+                - cd ..
+                
+                # S3にアップロード
+                - echo "Uploading layer package to S3..."
+                - aws s3 cp layer-package.zip s3://$LAYER_BUCKET/layers/$LAYER_NAME-$(date +%Y%m%d-%H%M%S).zip
+                - aws s3 cp layer-package.zip s3://$LAYER_BUCKET/layers/$LAYER_NAME-latest.zip
+                
+                - echo "Build completed successfully!"
+                
+            post_build:
+              commands:
+                - echo "Post-build phase completed on `date`"
+          
+          artifacts:
+            files:
+              - layer-package.zip
+              - requirements.txt
+            name: lambda-layer-artifacts-$CODEBUILD_BUILD_NUMBER
+          
+          cache:
+            paths:
+              - '/root/.cache/pip/**/*'
+      TimeoutInMinutes: 30
+      Tags:
+        - Key: Environment
+          Value: !Ref EnvironmentName
+        - Key: Purpose
+          Value: LambdaLayerPipelineBuilder
+
+  # CodePipeline (GitHub連携の場合のみ)
+  CodePipeline:
+    Type: AWS::CodePipeline::Pipeline
+    Condition: UseGitHub
+    Properties:
+      Name: !Sub "${AppName}-${EnvironmentName}-layer-pipeline"
+      RoleArn: !GetAtt CodePipelineServiceRole.Arn
+      ArtifactStore:
+        Type: S3
+        Location: !ImportValue 
+          Fn::Sub: "${S3StackName}-${EnvironmentName}-CodePipelineBucketName"
+      Stages:
+        - Name: Source
+          Actions:
+            - Name: SourceAction
+              ActionTypeId:
+                Category: Source
+                Owner: ThirdParty
+                Provider: GitHub
+                Version: '1'
+              Configuration:
+                Owner: !Ref GitHubOwner
+                Repo: !Ref GitHubRepo
+                Branch: !Ref GitHubBranch
+                OAuthToken: !Ref GitHubToken
+                PollForSourceChanges: true
+              OutputArtifacts:
+                - Name: SourceOutput
+
+        - Name: Build
+          Actions:
+            - Name: BuildAction
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Provider: CodeBuild
+                Version: '1'
+              Configuration:
+                ProjectName: !Ref CodeBuildPipelineProject
+              InputArtifacts:
+                - Name: SourceOutput
+              OutputArtifacts:
+                - Name: BuildOutput
+
+Outputs:
+  CodeBuildProjectName:
+    Description: Name of the CodeBuild project
+    Value: !Ref CodeBuildProject
+    Export:
+      Name: !Sub "${AWS::StackName}-CodeBuildProjectName"
+
+  CodeBuildProjectArn:
+    Description: ARN of the CodeBuild project
+    Value: !GetAtt CodeBuildProject.Arn
+    Export:
+      Name: !Sub "${AWS::StackName}-CodeBuildProjectArn"
+
+  LayerPackagesBucketName:
+    Description: Name of the S3 bucket for layer packages (from external S3 stack)
+    Value: !ImportValue 
+      Fn::Sub: "${S3StackName}-${EnvironmentName}-LambdaLayerBucketName"
+    Export:
+      Name: !Sub "${AWS::StackName}-LayerPackagesBucketName"
+
+  LayerPackagesBucketArn:
+    Description: ARN of the S3 bucket for layer packages (from external S3 stack)
+    Value: !ImportValue 
+      Fn::Sub: "${S3StackName}-${EnvironmentName}-LambdaLayerBucketArn"
+    Export:
+      Name: !Sub "${AWS::StackName}-LayerPackagesBucketArn"
+
+  PipelineName:
+    Condition: UseGitHub
+    Description: Name of the CodePipeline
+    Value: !Ref CodePipeline
+    Export:
+      Name: !Sub "${AWS::StackName}-PipelineName"
+
+  PipelineArtifactsBucketName:
+    Description: Name of the S3 bucket for pipeline artifacts (from external S3 stack)
+    Value: !ImportValue 
+      Fn::Sub: "${S3StackName}-${EnvironmentName}-CodePipelineBucketName"
+    Export:
+      Name: !Sub "${AWS::StackName}-PipelineArtifactsBucketName"
+
+  S3StackReference:
+    Description: Referenced S3 infrastructure stack
+    Value: !Sub "${S3StackName}-${EnvironmentName}"
+    Export:
+      Name: !Sub "${AWS::StackName}-S3StackReference"

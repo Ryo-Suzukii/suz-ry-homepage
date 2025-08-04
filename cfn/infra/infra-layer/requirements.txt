@@ -1,0 +1,20 @@
+# Essential AWS SDK
+boto3>=1.35.0
+
+# Basic HTTP requests
+requests>=2.31.0
+
+# JSON and data validation
+pydantic>=2.0.0
+
+# Date and time handling
+python-dateutil>=2.8.0
+
+# Environment and configuration
+python-dotenv>=1.0.0
+
+# Text processing
+PyYAML>=6.0
+
+# AWS-specific utilities
+aws-lambda-powertools>=2.25.0
