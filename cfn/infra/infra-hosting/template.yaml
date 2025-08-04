@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: 'Static website hosting with S3 and CloudFront'
+Description: 'S3 + CloudFront hosting infrastructure'
 
 Parameters:
   EnvironmentName:
@@ -9,8 +9,8 @@ Parameters:
   
   AppName:
     Type: String
-    Description: Application name
-    Default: sample-site
+    Description: Application name for hosting infrastructure
+    Default: infra-hosting
 
 Resources:
   # S3 Bucket for static website hosting - セキュア設定
@@ -29,6 +29,11 @@ Resources:
               SSEAlgorithm: AES256
       VersioningConfiguration:
         Status: Enabled
+      Tags:
+        - Key: Environment
+          Value: !Ref EnvironmentName
+        - Key: Purpose
+          Value: StaticWebsiteHosting
 
   # Origin Access Control (OAC) - CloudFrontからS3への安全なアクセス
   OriginAccessControl:
@@ -62,6 +67,7 @@ Resources:
     Type: AWS::CloudFront::Distribution
     Properties:
       DistributionConfig:
+        Comment: !Sub "${AppName}-${EnvironmentName} Static Website Distribution"
         Origins:
           - DomainName: !GetAtt S3Bucket.RegionalDomainName
             Id: S3Origin
@@ -103,10 +109,16 @@ Resources:
 
 Outputs:
   BucketName:
-    Description: Name of the S3 bucket
+    Description: Name of the S3 bucket for static website hosting
     Value: !Ref S3Bucket
     Export:
       Name: !Sub "${AWS::StackName}-BucketName"
+
+  BucketArn:
+    Description: ARN of the S3 bucket
+    Value: !GetAtt S3Bucket.Arn
+    Export:
+      Name: !Sub "${AWS::StackName}-BucketArn"
 
   CloudFrontURL:
     Description: CloudFront Distribution URL
@@ -119,6 +131,12 @@ Outputs:
     Value: !Ref CloudFrontDistribution
     Export:
       Name: !Sub "${AWS::StackName}-DistributionId"
+
+  DistributionDomainName:
+    Description: CloudFront Distribution Domain Name
+    Value: !GetAtt CloudFrontDistribution.DomainName
+    Export:
+      Name: !Sub "${AWS::StackName}-DistributionDomainName"
 
   OriginAccessControlId:
     Description: Origin Access Control ID
