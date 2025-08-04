@@ -79,18 +79,56 @@ else
     PROFILE_TO_USE="hoge_${ENVIRONMENT}"
 fi
 
+echo "Building React application..."
+npm run build
+
 echo "Deploying $APP_NAME to $ENVIRONMENT environment..."
 echo "AWS Profile: $PROFILE_TO_USE"
 echo "Environment Name: $ENVIRONMENT_NAME"
 
-# Deploy using SAM
-sam deploy \
+# Deploy using CloudFormation
+aws cloudformation deploy \
     --profile "$PROFILE_TO_USE" \
+    --template-file template.yaml \
+    --stack-name "${APP_NAME}-${ENVIRONMENT}" \
     --parameter-overrides \
         EnvironmentName="$ENVIRONMENT_NAME" \
         AppName="$APP_NAME" \
+    --capabilities CAPABILITY_IAM
+
+echo "Getting bucket name from CloudFormation stack..."
+BUCKET_NAME=$(aws cloudformation describe-stacks \
+    --profile "$PROFILE_TO_USE" \
     --stack-name "${APP_NAME}-${ENVIRONMENT}" \
-    --capabilities CAPABILITY_IAM \
-    --resolve-s3
+    --query 'Stacks[0].Outputs[?OutputKey==`BucketName`].OutputValue' \
+    --output text)
+
+echo "Uploading files to S3 bucket: $BUCKET_NAME"
+aws s3 sync dist/ s3://$BUCKET_NAME --delete --profile "$PROFILE_TO_USE"
+
+echo "Getting CloudFront distribution URL..."
+CLOUDFRONT_URL=$(aws cloudformation describe-stacks \
+    --profile "$PROFILE_TO_USE" \
+    --stack-name "${APP_NAME}-${ENVIRONMENT}" \
+    --query 'Stacks[0].Outputs[?OutputKey==`CloudFrontURL`].OutputValue' \
+    --output text)
+
+if [ ! -z "$CLOUDFRONT_URL" ]; then
+    DISTRIBUTION_ID=$(echo "$CLOUDFRONT_URL" | sed 's/https:\/\///' | sed 's/\.cloudfront\.net//')
+    echo "Creating CloudFront invalidation for distribution: $DISTRIBUTION_ID"
+    aws cloudfront create-invalidation \
+        --profile "$PROFILE_TO_USE" \
+        --distribution-id "$DISTRIBUTION_ID" \
+        --paths "/*"
+fi
 
 echo "Deployment completed successfully!"
+
+# Display URLs
+echo ""
+echo "Website URLs:"
+aws cloudformation describe-stacks \
+    --profile "$PROFILE_TO_USE" \
+    --stack-name "${APP_NAME}-${ENVIRONMENT}" \
+    --query 'Stacks[0].Outputs[?contains(OutputKey, `URL`)].{Key:OutputKey,Value:OutputValue}' \
+    --output table
