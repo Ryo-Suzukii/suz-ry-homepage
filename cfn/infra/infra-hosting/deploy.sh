@@ -66,10 +66,16 @@ if [ ! -f "$SETTING_FILE" ]; then
 fi
 
 ENVIRONMENT_NAME=$(jq -r '.EnvironmentName' "$SETTING_FILE")
+PROFILE_PREFIX=$(jq -r '.ProfilePrefix' "$SETTING_FILE")
 
-# Validate JSON value
+# Validate JSON values
 if [ -z "$ENVIRONMENT_NAME" ] || [ "$ENVIRONMENT_NAME" = "null" ]; then
     echo "Error: Invalid EnvironmentName in setting.json"
+    exit 1
+fi
+
+if [ -z "$PROFILE_PREFIX" ] || [ "$PROFILE_PREFIX" = "null" ]; then
+    echo "Error: Invalid ProfilePrefix in setting.json"
     exit 1
 fi
 
@@ -77,12 +83,9 @@ fi
 if [ -n "$CUSTOM_PROFILE" ]; then
     # Use custom profile if provided
     PROFILE_TO_USE="$CUSTOM_PROFILE"
-elif [ -n "$AWS_PROFILE" ]; then
-    # Use AWS_PROFILE environment variable if set
-    PROFILE_TO_USE="$AWS_PROFILE"
 else
-    # Default to hoge_{environment} pattern
-    PROFILE_TO_USE="hoge_${ENVIRONMENT}"
+    # Default to ProfilePrefix_{environment} pattern
+    PROFILE_TO_USE="${PROFILE_PREFIX}_${ENVIRONMENT}"
 fi
 
 echo "Deploying hosting infrastructure for $ENVIRONMENT environment..."

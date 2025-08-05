@@ -1,3 +1,4 @@
 {
-  "EnvironmentName": "dev"
+  "EnvironmentName": "dev",
+  "ProfilePrefix": "cocomotion"
 }
