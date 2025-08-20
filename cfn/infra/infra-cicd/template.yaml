@@ -1,0 +1,186 @@
+AWSTemplateFormatVersion: 2010-09-09
+Transform:
+  - AWS::Serverless-2016-10-31
+  - AWS::LanguageExtensions
+
+Parameters:
+  Region:
+    Type: String
+
+  EnvironmentPrefix:
+    Type: String
+
+  EnvironmentName:
+    Type: String
+
+  InfraName:
+    Type: String
+
+  CategoryName:
+    Type: String
+
+  AppName:
+    Type: String
+
+Resources:
+  Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub nexadata-${EnvironmentName}-${AppName}-${Region}
+      VersioningConfiguration:
+        Status: Enabled
+      NotificationConfiguration:
+        EventBridgeConfiguration:
+          EventBridgeEnabled: true
+      LifecycleConfiguration:
+        Rules:
+          - Id: !Sub ${EnvironmentName}-${AppName}-delete-old
+            Status: Enabled
+            NoncurrentVersionExpiration:
+              NoncurrentDays: 1
+          - Id: !Sub ${EnvironmentName}-${AppName}-delete-multipart
+            Status: Enabled
+            AbortIncompleteMultipartUpload:
+              DaysAfterInitiation: 1
+          - Id: !Sub ${EnvironmentName}-${AppName}-prefix
+            Status: Enabled
+            Prefix: !Ref EnvironmentPrefix
+            ExpirationInDays: 90
+          - Id: !Sub ${EnvironmentName}-${AppName}-artifact
+            Status: Enabled
+            Prefix: artifact/
+            ExpirationInDays: 90
+
+  CodeBuildLogGroup:
+    Type: AWS::Logs::LogGroup
+    UpdateReplacePolicy: Delete
+    DeletionPolicy: Delete
+    Properties:
+      LogGroupName: !Sub /aws/codebuild/${EnvironmentName}-${AppName}
+      RetentionInDays: 90
+
+  CodeBuildRole:
+    Type: AWS::IAM::Role
+    Properties:
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryFullAccess
+        - arn:aws:iam::aws:policy/AWSCloudFormationReadOnlyAccess
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action: sts:AssumeRole
+            Principal:
+              Service: codebuild.amazonaws.com
+      Path: /
+      Policies:
+        - PolicyName: AmazonS3FullAccess
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action: "s3:*"
+                Resource: "*"
+        - PolicyName: CloudWatchLogsFullAccess
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action: "logs:*"
+                Resource: "*"
+        - PolicyName: CloudFrontFullAccess
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action: "cloudfront:*"
+                Resource: "*"
+        - PolicyName: AWSSystemsManagerReadOnlyAccess
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ssm:List*
+                  - ssm:Get*
+                Resource: "*"
+        - PolicyName: SecretsManagerReadOnlyAccess
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - secretsmanager:Describe*
+                  - secretsmanager:Get*
+                  - secretsmanager:List*
+                Resource: "*"
+        - PolicyName: IAMRoleForCodeBuild
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action: sts:AssumeRole
+                Resource: "*"
+
+  CodePipelineRole:
+    Type: AWS::IAM::Role
+    Properties:
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/PowerUserAccess
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action: sts:AssumeRole
+            Principal:
+              Service:
+                - codepipeline.amazonaws.com
+                - cloudformation.amazonaws.com
+      Path: /
+      Policies:
+        - PolicyName: IAMRoleForCodePipeline
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - iam:*Role
+                  - iam:*RolePolicy
+                  - iam:*Policy
+                Resource: "*"
+
+  EventsRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action: sts:AssumeRole
+            Principal:
+              Service: events.amazonaws.com
+      Path: /
+      Policies:
+        - PolicyName: CodePipelineRoleForEvents
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action: codepipeline:StartPipelineExecution
+                Resource: "*"
+
+Outputs:
+  CodePipelineRole:
+    Value: !GetAtt CodePipelineRole.Arn
+    Export:
+      Name: !Sub ${EnvironmentName}-${AppName}-CodePipelineRole
+
+  CodeBuildRole:
+    Value: !GetAtt CodeBuildRole.Arn
+    Export:
+      Name: !Sub ${EnvironmentName}-${AppName}-CodeBuildRole
+
+  EventsRole:
+    Value: !GetAtt EventsRole.Arn
+    Export:
+      Name: !Sub ${EnvironmentName}-${AppName}-EventsRole

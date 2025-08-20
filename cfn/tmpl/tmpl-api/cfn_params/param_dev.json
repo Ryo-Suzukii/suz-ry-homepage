@@ -1,0 +1,8 @@
+{
+  "Parameters": {
+    "DeploymentPreference": "AllAtOnce",
+    "LogLevel": "INFO",
+    "LogEvent": "true",
+    "SystemLogLevel": "INFO"
+  }
+}

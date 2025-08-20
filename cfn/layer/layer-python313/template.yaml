@@ -1,0 +1,108 @@
+AWSTemplateFormatVersion: 2010-09-09
+Transform:
+  - AWS::Serverless-2016-10-31
+  - AWS::LanguageExtensions
+
+Parameters:
+  Region:
+    Type: String
+
+  EnvironmentPrefix:
+    Type: String
+
+  EnvironmentName:
+    Type: String
+
+  InfraName:
+    Type: String
+
+  CategoryName:
+    Type: String
+
+  AppName:
+    Type: String
+
+Resources:
+  AuthLayer:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      LayerName: !Sub ${EnvironmentName}-${AppName}-auth
+      ContentUri: src/auth
+      CompatibleRuntimes:
+        - python3.13
+      CompatibleArchitectures:
+        - arm64
+      RetentionPolicy: Retain
+    Metadata:
+      BuildMethod: makefile
+      BuildArchitecture: arm64
+
+  AuthLayerSsmParameter:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: !Sub /${EnvironmentName}/${AppName}/layer/auth
+      Type: String
+      Value: !Ref AuthLayer
+
+  CommonLayer:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      LayerName: !Sub ${EnvironmentName}-${AppName}-common
+      ContentUri: src/common
+      CompatibleRuntimes:
+        - python3.13
+      CompatibleArchitectures:
+        - arm64
+      RetentionPolicy: Retain
+    Metadata:
+      BuildMethod: makefile
+      BuildArchitecture: arm64
+
+  CommonLayerSsmParameter:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: !Sub /${EnvironmentName}/${AppName}/layer/common
+      Type: String
+      Value: !Ref CommonLayer
+
+  McpLayer:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      LayerName: !Sub ${EnvironmentName}-${AppName}-mcp
+      ContentUri: src/mcp
+      CompatibleRuntimes:
+        - python3.13
+      CompatibleArchitectures:
+        - arm64
+      RetentionPolicy: Retain
+    Metadata:
+      BuildMethod: makefile
+      BuildArchitecture: arm64
+
+  McpLayerSsmParameter:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: !Sub /${EnvironmentName}/${AppName}/layer/mcp
+      Type: String
+      Value: !Ref McpLayer
+
+  nexadataLayer:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      LayerName: !Sub ${EnvironmentName}-${AppName}-nexadata
+      ContentUri: src/nexadata
+      CompatibleRuntimes:
+        - python3.13
+      CompatibleArchitectures:
+        - arm64
+      RetentionPolicy: Retain
+    Metadata:
+      BuildMethod: makefile
+      BuildArchitecture: arm64
+
+  nexadataLayerSsmParameter:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: !Sub /${EnvironmentName}/${AppName}/layer/nexadata
+      Type: String
+      Value: !Ref nexadataLayer

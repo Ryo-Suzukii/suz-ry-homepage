@@ -1,0 +1,335 @@
+AWSTemplateFormatVersion: 2010-09-09
+Transform:
+  - AWS::Serverless-2016-10-31
+  - AWS::LanguageExtensions
+
+Parameters:
+  Region:
+    Type: String
+
+  EnvironmentPrefix:
+    Type: String
+
+  EnvironmentName:
+    Type: String
+
+  InfraName:
+    Type: String
+
+  CategoryName:
+    Type: String
+
+  AppName:
+    Type: String
+
+Resources:
+  ApiRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: apigateway.amazonaws.com
+            Action: sts:AssumeRole
+      Path: /
+      Policies:
+        - PolicyName: Database
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Sid: DynamoDBAccess
+                Effect: Allow
+                Action: dynamodb:*
+                Resource: "*"
+              - Sid: S3Access
+                Effect: Allow
+                Action: s3:*
+                Resource: "*"
+
+  LambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action: sts:AssumeRole
+            Principal:
+              Service: lambda.amazonaws.com
+      Path: /
+      Policies:
+        - PolicyName: Database
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Sid: DynamoDBAccess
+                Effect: Allow
+                Action: dynamodb:*
+                Resource: "*"
+              - Sid: S3Access
+                Effect: Allow
+                Action: s3:*
+                Resource: "*"
+        - PolicyName: DataLake
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Sid: AthenaAccess
+                Effect: Allow
+                Action: athena:*
+                Resource: "*"
+              - Sid: GlueAccess
+                Effect: Allow
+                Action: glue:*
+                Resource: "*"
+        - PolicyName: EventDriven
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Sid: EventsAccess
+                Effect: Allow
+                Action: events:*
+                Resource: "*"
+              - Sid: SNSAccess
+                Effect: Allow
+                Action: sns:*
+                Resource: "*"
+              - Sid: SQSAccess
+                Effect: Allow
+                Action: sqs:*
+                Resource: "*"
+        - PolicyName: Parameter
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Sid: SecretManagerAccess
+                Effect: Allow
+                Action: secretsmanager:*
+                Resource: "*"
+              - Sid: SSMAccess
+                Effect: Allow
+                Action: ssm:*
+                Resource: "*"
+        - PolicyName: Visualize
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Sid: QuicksightAccess
+                Effect: Allow
+                Action: quicksight:*
+                Resource: "*"
+
+  EcsTasksRole:
+    Type: AWS::IAM::Role
+    Properties:
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action: sts:AssumeRole
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+      Path: /
+      Policies:
+        - PolicyName: Log
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Sid: LogsAccess
+                Effect: Allow
+                Action: logs:*
+                Resource: "*"
+              - Sid: KinesisAccess
+                Effect: Allow
+                Action: kinesis:*
+                Resource: "*"
+              - Sid: FirehoseAccess
+                Effect: Allow
+                Action: firehose:*
+                Resource: "*"
+        - PolicyName: Debug
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Sid: SsmmessagesAccess
+                Effect: Allow
+                Action: ssmmessages:*
+                Resource: "*"
+
+  ApplicationAutoscalingRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action: sts:AssumeRole
+            Principal:
+              Service: application-autoscaling.amazonaws.com
+      Path: /
+      Policies:
+        - PolicyName: Autoscaling
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Sid: ApplicationAutoscalingAccess
+                Effect: Allow
+                Action: application-autoscaling:*
+                Resource: "*"
+              - Sid: CloudWatchAccess
+                Effect: Allow
+                Action: cloudwatch:*
+                Resource: "*"
+              - Sid: ECSAccess
+                Effect: Allow
+                Action: ecs:*
+                Resource: "*"
+
+  FirehoseRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action: sts:AssumeRole
+            Principal:
+              Service: firehose.amazonaws.com
+      Path: /
+      Policies:
+        - PolicyName: Database
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Sid: DynamoDBAccess
+                Effect: Allow
+                Action: dynamodb:*
+                Resource: "*"
+              - Sid: S3Access
+                Effect: Allow
+                Action: s3:*
+                Resource: "*"
+        - PolicyName: Log
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Sid: LogsAccess
+                Effect: Allow
+                Action: logs:*
+                Resource: "*"
+              - Sid: KinesisAccess
+                Effect: Allow
+                Action: kinesis:*
+                Resource: "*"
+              - Sid: FirehoseAccess
+                Effect: Allow
+                Action: firehose:*
+                Resource: "*"
+
+  SchedulerRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action: sts:AssumeRole
+            Principal:
+              Service: scheduler.amazonaws.com
+      Path: /
+      Policies:
+        - PolicyName: EventDriven
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Sid: EventsAccess
+                Effect: Allow
+                Action: events:*
+                Resource: "*"
+              - Sid: SNSAccess
+                Effect: Allow
+                Action: sns:*
+                Resource: "*"
+              - Sid: SQSAccess
+                Effect: Allow
+                Action: sqs:*
+                Resource: "*"
+        - PolicyName: Executor
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Sid: LambdaAccess
+                Effect: Allow
+                Action: lambda:*
+                Resource: "*"
+              - Sid: BatchAccess
+                Effect: Allow
+                Action: batch:*
+                Resource: "*"
+        - PolicyName: Visualize
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Sid: QuicksightAccess
+                Effect: Allow
+                Action: quicksight:*
+                Resource: "*"
+
+  SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      VpcId:
+        Fn::ImportValue: !Sub ibaws-vpcId-ibaws-system-vpc-${AWS::Region}
+      GroupDescription: Security Group
+      SecurityGroupIngress:
+        - CidrIp: 0.0.0.0/0
+          IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+        - CidrIp: 0.0.0.0/0
+          IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+
+Outputs:
+  ApiRole:
+    Value: !GetAtt ApiRole.Arn
+    Export:
+      Name: !Sub ${EnvironmentName}-${AppName}-ApiRole
+
+  LambdaRole:
+    Value: !GetAtt LambdaRole.Arn
+    Export:
+      Name: !Sub ${EnvironmentName}-${AppName}-LambdaRole
+
+  EcsTasksRole:
+    Value: !GetAtt EcsTasksRole.Arn
+    Export:
+      Name: !Sub ${EnvironmentName}-${AppName}-EcsTasksRole
+
+  ApplicationAutoscalingRole:
+    Value: !GetAtt ApplicationAutoscalingRole.Arn
+    Export:
+      Name: !Sub ${EnvironmentName}-${AppName}-ApplicationAutoscalingRole
+
+  FirehoseRole:
+    Value: !GetAtt FirehoseRole.Arn
+    Export:
+      Name: !Sub ${EnvironmentName}-${AppName}-FirehoseRole
+
+  SchedulerRole:
+    Value: !GetAtt SchedulerRole.Arn
+    Export:
+      Name: !Sub ${EnvironmentName}-${AppName}-SchedulerRole
+
+  SecurityGroup:
+    Value: !Ref SecurityGroup
+    Export:
+      Name: !Sub ${EnvironmentName}-${AppName}-SecurityGroup

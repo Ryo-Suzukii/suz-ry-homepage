@@ -1,0 +1,10 @@
+[project]
+# TODO: 適切な名前に変更する
+name = "data-image"
+version = "0.0.0"
+requires-python = ">=3.13"
+dependencies = [
+    "aws-lambda-powertools>=3.11.0",
+    "awswrangler>=3.11.0",
+    "python-decouple>=3.8",
+]

@@ -1,0 +1,7 @@
+{
+  "Parameters": {
+    "LogLevel": "INFO",
+    "LogEvent": "true",
+    "SystemLogLevel": "INFO"
+  }
+}

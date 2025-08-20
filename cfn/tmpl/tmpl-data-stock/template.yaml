@@ -1,0 +1,180 @@
+AWSTemplateFormatVersion: 2010-09-09
+Transform:
+  - AWS::Serverless-2016-10-31
+  - AWS::LanguageExtensions
+
+Parameters:
+  Region:
+    Type: String
+
+  EnvironmentPrefix:
+    Type: String
+
+  EnvironmentName:
+    Type: String
+
+  InfraName:
+    Type: String
+
+  CategoryName:
+    Type: String
+
+  AppName:
+    Type: String
+
+  LogLevel:
+    Type: String
+
+  LogEvent:
+    Type: String
+
+  SystemLogLevel:
+    Type: String
+    AllowedValues:
+      - DEBUG
+      - INFO
+      - WARN
+
+Mappings:
+  Const:
+    Config:
+      Timeout: 300
+    Topic:
+      # TODO: 正しいタグIDを指定する
+      Arn: arn:aws:sns:ap-northeast-1:928225274854:TagID-000000000
+
+Globals:
+  Function:
+    Architectures:
+      - arm64
+    Runtime: python3.13
+    Handler: app.lambda_function.lambda_handler
+    Timeout: !FindInMap
+      - Const
+      - Config
+      - Timeout
+    AutoPublishAlias: live
+    Layers:
+      - !Sub "{{resolve:ssm:/${InfraName}/layer-python313/layer/nexadata}}"
+      - !Sub "{{resolve:ssm:/${InfraName}/layer-python313/layer/common}}"
+      - !Sub arn:aws:lambda:${AWS::Region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python313-arm64:13
+      - !Sub arn:aws:lambda:${AWS::Region}:336392948345:layer:AWSSDKPandas-Python313-Arm64:1
+    VpcConfig:
+      SecurityGroupIds:
+        - Fn::ImportValue: !Sub ${EnvironmentName}-infra-security-SecurityGroup
+      SubnetIds:
+        - !ImportValue ibaws-az-ibaws-system-vpc-Private0
+        - !ImportValue ibaws-az-ibaws-system-vpc-Private1
+        - !ImportValue ibaws-az-ibaws-system-vpc-Private2
+    LoggingConfig:
+      LogFormat: JSON
+      ApplicationLogLevel: !Ref LogLevel
+      SystemLogLevel: !Ref SystemLogLevel
+    Environment:
+      Variables:
+        POWERTOOLS_SERVICE_NAME: !Sub ${EnvironmentName}-${AppName}
+        POWERTOOLS_LOGGER_LOG_EVENT: !Ref LogEvent
+
+Resources:
+  Function:
+    Type: AWS::Serverless::Function
+    Properties:
+      Role:
+        Fn::ImportValue: !Sub ${EnvironmentName}-infra-security-LambdaRole
+      MemorySize: 1024
+      CodeUri: src
+      Events:
+        Sqs:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt Queue.Arn
+            ScalingConfig:
+              MaximumConcurrency: 10
+            FunctionResponseTypes:
+              - ReportBatchItemFailures
+
+  FunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    UpdateReplacePolicy: Delete
+    DeletionPolicy: Delete
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${Function}
+      RetentionInDays: 90
+
+  FunctionLogGroupSubscriptionFilter:
+    Type: AWS::Logs::SubscriptionFilter
+    Properties:
+      DestinationArn:
+        Fn::ImportValue: !Sub ${InfraName}-alert-slack-Function
+      FilterPattern: '{ $.level = "WARNING" || $.level = "ERROR" }'
+      LogGroupName: !Ref FunctionLogGroup
+
+  Queue:
+    Type: AWS::SQS::Queue
+    UpdateReplacePolicy: Delete
+    DeletionPolicy: Delete
+    Properties:
+      ReceiveMessageWaitTimeSeconds: 20
+      MessageRetentionPeriod: 86400
+      VisibilityTimeout: !FindInMap
+        - Const
+        - Config
+        - Timeout
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt DeadLetterQueue.Arn
+        maxReceiveCount: 3
+
+  DeadLetterQueue:
+    Type: AWS::SQS::Queue
+    UpdateReplacePolicy: Delete
+    DeletionPolicy: Delete
+    Properties:
+      ReceiveMessageWaitTimeSeconds: 20
+      MessageRetentionPeriod: 1209600
+
+  DeadLetterQueueAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      Namespace: AWS/SQS
+      MetricName: ApproximateNumberOfMessagesVisible
+      Dimensions:
+        - Name: QueueName
+          Value: !GetAtt DeadLetterQueue.QueueName
+      Statistic: Maximum
+      Period: 60
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      DatapointsToAlarm: 1
+      EvaluationPeriods: 1
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - Fn::ImportValue: !Sub ${InfraName}-alert-topic-Topic
+
+  Subscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      TopicArn: !FindInMap
+        - Const
+        - Topic
+        - Arn
+      Protocol: sqs
+      Endpoint: !GetAtt Queue.Arn
+      FilterPolicy:
+        time_diff:
+          - numeric:
+              - <=
+              - 3600
+
+  Connector:
+    Type: AWS::Serverless::Connector
+    Properties:
+      Source:
+        Type: AWS::SNS::Topic
+        Arn: !FindInMap
+          - Const
+          - Topic
+          - Arn
+      Destination:
+        Id: Queue
+      Permissions:
+        - Write

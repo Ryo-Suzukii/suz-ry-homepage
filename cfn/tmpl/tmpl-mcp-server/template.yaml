@@ -1,0 +1,240 @@
+AWSTemplateFormatVersion: 2010-09-09
+Transform:
+  - AWS::Serverless-2016-10-31
+  - AWS::LanguageExtensions
+
+Parameters:
+  Region:
+    Type: String
+
+  EnvironmentPrefix:
+    Type: String
+
+  EnvironmentName:
+    Type: String
+
+  InfraName:
+    Type: String
+
+  CategoryName:
+    Type: String
+
+  AppName:
+    Type: String
+
+  DeploymentPreference:
+    Type: String
+
+  LogLevel:
+    Type: String
+
+  LogEvent:
+    Type: String
+
+  SystemLogLevel:
+    Type: String
+    AllowedValues:
+      - DEBUG
+      - INFO
+      - WARN
+
+Mappings:
+  Const:
+    Config:
+      PathPrefix: mcp/v1/tmpl
+      Timeout: 25
+
+Globals:
+  Api:
+    OpenApiVersion: 3.0.2
+    EndpointConfiguration:
+      Type: REGIONAL
+    MethodSettings:
+      - HttpMethod: "*"
+        ResourcePath: /*
+        LoggingLevel: "OFF"
+        ThrottlingRateLimit: 100
+        ThrottlingBurstLimit: 200
+
+  Function:
+    Architectures:
+      - arm64
+    Runtime: python3.13
+    Timeout: !FindInMap
+      - Const
+      - Config
+      - Timeout
+    AutoPublishAlias: live
+    Layers:
+      - !Sub "{{resolve:ssm:/${InfraName}/layer-python313/layer/nexadata}}"
+      - !Sub "{{resolve:ssm:/${InfraName}/layer-python313/layer/mcp}}"
+      - !Sub arn:aws:lambda:${AWS::Region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python313-arm64:13
+      - !Sub arn:aws:lambda:${AWS::Region}:753240598075:layer:LambdaAdapterLayerArm64:25
+    VpcConfig:
+      SecurityGroupIds:
+        - Fn::ImportValue: !Sub ${EnvironmentName}-infra-security-SecurityGroup
+      SubnetIds:
+        - !ImportValue ibaws-az-ibaws-system-vpc-Private0
+        - !ImportValue ibaws-az-ibaws-system-vpc-Private1
+        - !ImportValue ibaws-az-ibaws-system-vpc-Private2
+    LoggingConfig:
+      LogFormat: JSON
+      ApplicationLogLevel: !Ref LogLevel
+      SystemLogLevel: !Ref SystemLogLevel
+    Environment:
+      Variables:
+        POWERTOOLS_SERVICE_NAME: !Sub ${EnvironmentName}-${AppName}
+        POWERTOOLS_LOGGER_LOG_EVENT: !Ref LogEvent
+        PATH_PREFIX: !FindInMap
+          - Const
+          - Config
+          - PathPrefix
+        AWS_LAMBDA_EXEC_WRAPPER: /opt/bootstrap
+        PORT: 8080
+
+Resources:
+  Api:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: v1
+      DisableExecuteApiEndpoint: true
+      AccessLogSetting:
+        DestinationArn:
+          Fn::ImportValue: !Sub ${EnvironmentName}-api-common-LogGroup
+        Format:
+          Fn::ToJsonString:
+            apiId: $context.apiId
+            requestId: $context.requestId
+            userId: $context.authorizer.principalId
+            method: $context.httpMethod
+            path: $context.path
+            sourceIp: $context.identity.sourceIp
+            userAgent: $context.identity.userAgent
+            status: $context.status
+            wafStatus: $context.waf.status
+            authorizerStatus: $context.authorizer.status
+            integrationStatus: $context.integration.status
+            latency: $context.responseLatency
+            wafLatency: $context.waf.latency
+            authorizerLatency: $context.authorizer.latency
+            integrationLatency: $context.integration.latency
+            requestTime: $context.requestTime
+            requestTimeEpoch: $context.requestTimeEpoch
+            length: $context.responseLength
+            errorType: $context.error.responseType
+            error: $context.error.message
+            wafError: $context.waf.error
+            authorizerError: $context.authorizer.error
+            integrationError: $context.integration.error
+      Cors:
+        AllowOrigin: "'*'"
+        AllowHeaders: "'*'"
+        AllowMethods: "'*'"
+        MaxAge: "'3600'"
+
+  ApiMapping:
+    DependsOn: Apiv1Stage
+    Type: AWS::ApiGatewayV2::ApiMapping
+    Properties:
+      DomainName: !Sub "${EnvironmentName}-api-common.{{resolve:ssm:/${InfraName}/infra-resource/host-zone/domain}}"
+      ApiMappingKey: !FindInMap
+        - Const
+        - Config
+        - PathPrefix
+      ApiId: !Ref Api
+      Stage: v1
+
+  Api4XXErrorAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      Namespace: AWS/ApiGateway
+      MetricName: 4XXError
+      Dimensions:
+        - Name: ApiName
+          Value: !Sub ${EnvironmentName}-${AppName}
+      Statistic: Sum
+      Period: 60
+      Threshold: 10
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      DatapointsToAlarm: 1
+      EvaluationPeriods: 1
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - Fn::ImportValue: !Sub ${InfraName}-alert-topic-Topic
+
+  Api5XXErrorAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      Namespace: AWS/ApiGateway
+      MetricName: 5XXError
+      Dimensions:
+        - Name: ApiName
+          Value: !Sub ${EnvironmentName}-${AppName}
+      Statistic: Sum
+      Period: 60
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      DatapointsToAlarm: 1
+      EvaluationPeriods: 1
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - Fn::ImportValue: !Sub ${InfraName}-alert-topic-Topic
+
+  Function:
+    Type: AWS::Serverless::Function
+    Properties:
+      Role:
+        Fn::ImportValue: !Sub ${EnvironmentName}-infra-security-LambdaRole
+      MemorySize: 1024
+      CodeUri: src
+      Handler: run.sh
+      DeploymentPreference:
+        Enabled: true
+        Type: !Ref DeploymentPreference
+        Alarms:
+          - !Ref FunctionAlarm
+      Events:
+        Mcp:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Method: ANY
+            Path: /{proxy+}
+    Metadata:
+      BuildMethod: makefile
+
+  FunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    UpdateReplacePolicy: Delete
+    DeletionPolicy: Delete
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${Function}
+      RetentionInDays: 90
+
+  FunctionLogGroupSubscriptionFilter:
+    Type: AWS::Logs::SubscriptionFilter
+    Properties:
+      DestinationArn:
+        Fn::ImportValue: !Sub ${InfraName}-alert-slack-Function
+      FilterPattern: '{ $.level = "WARNING" || $.level = "ERROR" }'
+      LogGroupName: !Ref FunctionLogGroup
+
+  FunctionAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref Function
+        - Name: Resource
+          Value: !Sub
+            - ${Function}:${Version}
+            - Version: !GetAtt Function.Version.Version
+      Statistic: Sum
+      Period: 60
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      DatapointsToAlarm: 1
+      EvaluationPeriods: 1
+      TreatMissingData: notBreaching

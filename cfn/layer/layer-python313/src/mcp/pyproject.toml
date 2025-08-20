@@ -1,0 +1,9 @@
+[project]
+name = "nexadata-mcp"
+version = "0.0.0"
+requires-python = ">=3.13"
+dependencies = [
+    "fastapi>=0.116.0",
+    "fastmcp>=2.10.3",
+    "uvicorn>=0.35.0",
+]

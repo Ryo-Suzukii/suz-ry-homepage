@@ -1,0 +1,7 @@
+{
+  "Parameters": {
+    "LogLevel": "WARN",
+    "LogEvent": "false",
+    "SystemLogLevel": "WARN"
+  }
+}

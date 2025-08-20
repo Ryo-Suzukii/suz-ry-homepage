@@ -1,0 +1,13 @@
+[project]
+name = "common"
+version = "0.0.0"
+requires-python = ">=3.13"
+dependencies = [
+    "geojson>=3.2.0",
+    "httpx[zstd]>=0.28.1",
+    "orjson>=3.10.16",
+    "python-ulid>=3.0.0",
+    "tenacity>=9.1.2",
+    "xmltodict>=0.14.2",
+    "zstandard>=0.23.0",
+]

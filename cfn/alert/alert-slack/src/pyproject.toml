@@ -1,0 +1,5 @@
+[project]
+name = "alert"
+version = "0.0.0"
+requires-python = ">=3.13"
+dependencies = ["slack-sdk>=3.35.0"]

@@ -1,0 +1,8 @@
+{
+  "Parameters": {
+    "DeploymentPreference": "Canary10Percent5Minutes",
+    "LogLevel": "WARN",
+    "LogEvent": "false",
+    "SystemLogLevel": "WARN"
+  }
+}

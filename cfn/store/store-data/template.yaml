@@ -1,0 +1,78 @@
+AWSTemplateFormatVersion: 2010-09-09
+Transform:
+  - AWS::Serverless-2016-10-31
+  - AWS::LanguageExtensions
+
+Parameters:
+  Region:
+    Type: String
+
+  EnvironmentPrefix:
+    Type: String
+
+  EnvironmentName:
+    Type: String
+
+  InfraName:
+    Type: String
+
+  CategoryName:
+    Type: String
+
+  AppName:
+    Type: String
+
+Resources:
+  Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub nexadata-${EnvironmentName}-${AppName}-${Region}
+      LifecycleConfiguration:
+        Rules:
+          - Id: !Sub ${EnvironmentName}-${AppName}-delete-multipart
+            Status: Enabled
+            AbortIncompleteMultipartUpload:
+              DaysAfterInitiation: 1
+          - Id: !Sub ${EnvironmentName}-${AppName}-intelligent-tiering
+            Status: Enabled
+            Transition:
+              StorageClass: INTELLIGENT_TIERING
+              TransitionInDays: 0
+          - Id: !Sub ${EnvironmentName}-${AppName}-cache
+            Status: Enabled
+            ExpirationInDays: 5
+            Prefix: cache/
+          - Id: !Sub ${EnvironmentName}-${AppName}-short
+            Status: Enabled
+            ExpirationInDays: 15
+            Prefix: short/
+          - Id: !Sub ${EnvironmentName}-${AppName}-middle
+            Status: Enabled
+            ExpirationInDays: 35
+            Prefix: middle/
+          - Id: !Sub ${EnvironmentName}-${AppName}-long
+            Status: Enabled
+            ExpirationInDays: 400
+            Prefix: long/
+
+  Table:
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub ${EnvironmentName}-${AppName}
+      BillingMode: PAY_PER_REQUEST
+      DeletionProtectionEnabled: true
+      AttributeDefinitions:
+        - AttributeName: key
+          AttributeType: S
+        - AttributeName: tm
+          AttributeType: S
+      KeySchema:
+        - AttributeName: key
+          KeyType: HASH
+        - AttributeName: tm
+          KeyType: RANGE
+      TimeToLiveSpecification:
+        Enabled: true
+        AttributeName: ttl

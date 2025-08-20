@@ -1,0 +1,11 @@
+{
+  "Parameters": {
+    "LogLevel": "WARN",
+    "LogEvent": "false",
+    "SystemLogLevel": "WARN",
+    "SlackUserName": "BtobProjectTemplate",
+    "SlackIconEmoji": ":moji_ng:",
+    "AlertLevel": "info,warning,error,critical",
+    "Timezone": "Asia/Tokyo"
+  }
+}
