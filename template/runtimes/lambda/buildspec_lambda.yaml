@@ -1,0 +1,26 @@
+version: 0.2
+
+phases:
+  pre_build:
+    commands:
+      - echo PreBuild `date`
+      - if [ -n "$SAM_VERSION" ]; then pip install -q -U aws-sam-cli==$SAM_VERSION; fi
+      - if [ command -v pip > /dev/null 2>&1 ]; then pip install uv; fi
+      - aws --version
+      - sam --version
+  build:
+    commands:
+      - echo Build `date`
+      - sam build
+  post_build:
+    commands:
+      - echo PostBuild `date`
+      - sam package
+        --s3-bucket $S3_BUCKET
+        --s3-prefix artifact/$ENVIRONMENT_NAME/$APP_NAME
+        --output-template-file packaged.yaml
+        --no-progressbar
+
+artifacts:
+  files:
+    - packaged.yaml

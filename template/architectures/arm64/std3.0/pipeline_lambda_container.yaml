@@ -1,0 +1,288 @@
+AWSTemplateFormatVersion: 2010-09-09
+Transform:
+  - AWS::Serverless-2016-10-31
+  - AWS::LanguageExtensions
+
+Parameters:
+  Region:
+    Type: String
+
+  EnvironmentPrefix:
+    Type: String
+
+  EnvironmentName:
+    Type: String
+
+  InfraName:
+    Type: String
+
+  CategoryName:
+    Type: String
+
+  AppName:
+    Type: String
+
+  BaseImage:
+    Type: String
+    Default: ""
+
+  SamVersion:
+    Type: String
+    Default: ""
+
+  CodeBuildType:
+    Type: String
+    Default: ""
+
+  CodeBuildComputeType:
+    Type: String
+    Default: ""
+
+  CodeBuildImage:
+    Type: String
+    Default: ""
+
+Mappings:
+  Const:
+    Base:
+      Image: public.ecr.aws/lambda/python
+    CodeBuild:
+      Type: ARM_CONTAINER
+      ComputeType: BUILD_GENERAL1_SMALL
+      Image: aws/codebuild/amazonlinux2-aarch64-standard:3.0
+
+Conditions:
+  HasBaseImage: !Not
+    - !Or
+      - !Equals
+        - !Ref BaseImage
+        - ""
+      - !Equals
+        - !Ref BaseImage
+        - "-"
+
+  HasSamVersion: !Not
+    - !Or
+      - !Equals
+        - !Ref SamVersion
+        - ""
+      - !Equals
+        - !Ref SamVersion
+        - "-"
+
+  HasCodeBuildType: !Not
+    - !Or
+      - !Equals
+        - !Ref CodeBuildType
+        - ""
+      - !Equals
+        - !Ref CodeBuildType
+        - "-"
+
+  HasCodeBuildComputeType: !Not
+    - !Or
+      - !Equals
+        - !Ref CodeBuildComputeType
+        - ""
+      - !Equals
+        - !Ref CodeBuildComputeType
+        - "-"
+
+  HasCodeBuildImage: !Not
+    - !Or
+      - !Equals
+        - !Ref CodeBuildImage
+        - ""
+      - !Equals
+        - !Ref CodeBuildImage
+        - "-"
+
+Resources:
+  CodePipeline:
+    Type: AWS::CodePipeline::Pipeline
+    Properties:
+      Name: !Sub ${EnvironmentName}-${AppName}
+      PipelineType: V2
+      RoleArn:
+        Fn::ImportValue: !Sub ${InfraName}-infra-cicd-CodePipelineRole
+      ArtifactStore:
+        Type: S3
+        Location: !Sub wni-${InfraName}-infra-cicd-${Region}
+      Stages:
+        - Name: Source
+          Actions:
+            - Name: download-source
+              ActionTypeId:
+                Category: Source
+                Owner: AWS
+                Version: 1
+                Provider: S3
+              Configuration:
+                S3Bucket: !Sub wni-${InfraName}-infra-cicd-${Region}
+                S3ObjectKey: !Sub artifact/${EnvironmentName}/${AppName}_input.zip
+                PollForSourceChanges: false
+              OutputArtifacts:
+                - Name: SourceOutput
+        - Name: Build
+          Actions:
+            - Name: build
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Version: 1
+                Provider: CodeBuild
+              Configuration:
+                ProjectName: !Ref CodeBuild
+              InputArtifacts:
+                - Name: SourceOutput
+              OutputArtifacts:
+                - Name: BuildOutput
+        - Name: PreDeploy
+          Actions:
+            - Name: create-changeset
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Version: 1
+                Provider: CloudFormation
+              Configuration:
+                StackName: !Sub ${EnvironmentName}-${AppName}
+                ChangeSetName: changeset
+                ActionMode: CHANGE_SET_REPLACE
+                RoleArn:
+                  Fn::ImportValue: !Sub ${InfraName}-infra-cicd-CodePipelineRole
+                Capabilities: CAPABILITY_NAMED_IAM,CAPABILITY_AUTO_EXPAND
+                TemplatePath: BuildOutput::packaged.yaml
+                TemplateConfiguration: SourceOutput::cfn_params/param.json
+              InputArtifacts:
+                - Name: SourceOutput
+                - Name: BuildOutput
+        - Name: Approval
+          Actions:
+            - Name: approve
+              ActionTypeId:
+                Category: Approval
+                Owner: AWS
+                Version: 1
+                Provider: Manual
+        - Name: Deploy
+          Actions:
+            - Name: execute-changeset
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Version: 1
+                Provider: CloudFormation
+              Configuration:
+                StackName: !Sub ${EnvironmentName}-${AppName}
+                ChangeSetName: changeset
+                ActionMode: CHANGE_SET_EXECUTE
+                RoleArn:
+                  Fn::ImportValue: !Sub ${InfraName}-infra-cicd-CodePipelineRole
+
+  CodeBuild:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: !Sub ${EnvironmentName}-${AppName}
+      ServiceRole:
+        Fn::ImportValue: !Sub ${InfraName}-infra-cicd-CodeBuildRole
+      Artifacts:
+        Type: CODEPIPELINE
+      LogsConfig:
+        CloudWatchLogs:
+          Status: ENABLED
+          GroupName: !Sub /aws/codebuild/${InfraName}-infra-cicd
+          StreamName: !Sub ${EnvironmentName}-${AppName}
+      Environment:
+        Type: !If
+          - HasCodeBuildType
+          - !Ref CodeBuildType
+          - !FindInMap
+            - Const
+            - CodeBuild
+            - Type
+        ComputeType: !If
+          - HasCodeBuildComputeType
+          - !Ref CodeBuildComputeType
+          - !FindInMap
+            - Const
+            - CodeBuild
+            - ComputeType
+        Image: !If
+          - HasCodeBuildImage
+          - !Ref CodeBuildImage
+          - !FindInMap
+            - Const
+            - CodeBuild
+            - Image
+        PrivilegedMode: true
+        EnvironmentVariables:
+          - Name: ENVIRONMENT_NAME
+            Value: !Ref EnvironmentName
+          - Name: APP_NAME
+            Value: !Ref AppName
+          - Name: S3_BUCKET
+            Value: !Sub wni-${InfraName}-infra-cicd-${Region}
+          - Name: ACCOUNT_ID
+            Value: !Ref AWS::AccountId
+          - Name: REPOSITORY_URI
+            Value: !Sub ${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${Repository}
+          - Name: BASE_IMAGE
+            Value: !If
+              - HasBaseImage
+              - !Ref BaseImage
+              - !FindInMap
+                - Const
+                - Base
+                - Image
+          - !If
+            - HasSamVersion
+            - Name: SAM_VERSION
+              Value: !Ref SamVersion
+            - !Ref AWS::NoValue
+      Source:
+        Type: CODEPIPELINE
+        BuildSpec: buildspec.yaml
+
+  Events:
+    Type: AWS::Events::Rule
+    Properties:
+      State: ENABLED
+      EventPattern:
+        source:
+          - aws.s3
+        detail-type:
+          - Object Created
+        detail:
+          bucket:
+            name:
+              - !Sub wni-${InfraName}-infra-cicd-${Region}
+          object:
+            key:
+              - !Sub artifact/${EnvironmentName}/${AppName}_input.zip
+      Targets:
+        - Id: !Sub ${EnvironmentName}-${AppName}
+          Arn: !Sub arn:aws:codepipeline:${AWS::Region}:${AWS::AccountId}:${CodePipeline}
+          RoleArn:
+            Fn::ImportValue: !Sub ${InfraName}-infra-cicd-EventsRole
+
+  Repository:
+    Type: AWS::ECR::Repository
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
+    Properties:
+      RepositoryName: !Sub ${EnvironmentName}-${AppName}
+      ImageScanningConfiguration:
+        ScanOnPush: true
+      LifecyclePolicy:
+        LifecyclePolicyText:
+          Fn::ToJsonString:
+            rules:
+              - rulePriority: 1
+                description: Retain 20 images at most
+                selection:
+                  tagStatus: any
+                  countType: imageCountMoreThan
+                  countNumber: 20
+                action:
+                  type: expire
