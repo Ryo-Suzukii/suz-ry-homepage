@@ -1,0 +1,28 @@
+AWSTemplateFormatVersion: 2010-09-09
+Transform:
+  - AWS::Serverless-2016-10-31
+  - AWS::LanguageExtensions
+
+
+Parameters:
+  DomainName:
+    Type: String
+  SubDomainPrefix:
+    Type: String
+
+Resources:
+  # dev-b.parent.com のホストゾーン
+  DevSubdomainHostedZone:
+    Type: 'AWS::Route53::HostedZone'
+    Properties:
+      Name: !Sub ${SubDomainPrefix}-${DomainName}
+      HostedZoneConfig:
+        Comment: 'Hosted zone for sub domain'
+
+Outputs:
+  DevSubdomainHostedZoneId:
+    Description: The ID of the dev-b.parent.com hosted zone.
+    Value: !Ref DevSubdomainHostedZone
+  DevSubdomainNameServers:
+    Description: The name servers for the dev-b.parent.com hosted zone.
+    Value: !Join [ ',', !GetAtt DevSubdomainHostedZone.NameServers ]

@@ -46,6 +46,22 @@ function check_and_set_env() {
 }
 
 function deploy() {
+    local _REGION="${DeployRegion:?}"
+    
+    if [ $# -ge 1 ]; then
+        case "$1" in
+            "ane1")
+                _REGION="ap-northeast-1"
+                ;;
+            "use1")
+                _REGION="us-east-1"
+                ;;
+            *)
+                _REGION="$1"
+                ;;
+        esac
+    fi
+
     if [ "$ParamForceDeploy" == true ]; then
         add_env '{"Parameters":{"Version":"'"$(get_random_str)"'"}}'
     fi
@@ -62,7 +78,7 @@ function deploy() {
             --stack-name "${EnvironmentName:?}"-"${AppName:?}" \
             --capabilities CAPABILITY_NAMED_IAM \
             --parameter-overrides "$_PARAMS" \
-            --region "${DeployRegion:?}" \
+            --region "$_REGION" \
             --profile "${Profile:?}" \
             --tags "$_TAGS" \
             --s3-bucket wni-"${InfraName:?}"-infra-cicd-"${Region:?}" \
@@ -72,7 +88,7 @@ function deploy() {
             --stack-name "${EnvironmentName:?}"-"${AppName:?}" \
             --capabilities CAPABILITY_NAMED_IAM \
             --parameter-overrides "$_PARAMS" \
-            --region "${DeployRegion:?}" \
+            --region "$_REGION" \
             --profile "${Profile:?}" \
             --tags "$_TAGS"
     fi
