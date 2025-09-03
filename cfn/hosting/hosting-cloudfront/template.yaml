@@ -78,8 +78,8 @@ Resources:
           OriginRequestPolicyId: 88a5eaf4-2fd4-4709-b370-b4c650ea3fcf
           ResponseHeadersPolicyId: 60669652-455b-4ae9-85a4-c4c02393f86c
           ViewerProtocolPolicy: redirect-to-https
-          TrustedKeyGroups:
-            - Fn::ImportValue: !Sub ${EnvironmentName}-infra-keypair-KeyGroup
+          # TrustedKeyGroups:
+          #   - Fn::ImportValue: !Sub ${EnvironmentName}-infra-keypair-KeyGroup
         CacheBehaviors:
           - TargetOriginId: !Sub ${EnvironmentName}-${AppName}-s3
             PathPattern: /public/*
