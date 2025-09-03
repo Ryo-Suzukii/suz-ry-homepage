@@ -1,0 +1,9 @@
+{
+  "Exports": {
+    "DeployRegion": "us-east-1"
+  },
+  "Parameters": {
+    "Region": "use1",
+    "Domain": "-"
+  }
+}

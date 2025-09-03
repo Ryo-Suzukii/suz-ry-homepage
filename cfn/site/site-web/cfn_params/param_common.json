@@ -1,0 +1,6 @@
+{
+  "Parameters": {
+    "Target": "public/web",
+    "TTL": "600"
+  }
+}

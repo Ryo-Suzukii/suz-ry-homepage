@@ -81,7 +81,7 @@ function deploy() {
             --region "$_REGION" \
             --profile "${Profile:?}" \
             --tags "$_TAGS" \
-            --s3-bucket wni-"${InfraName:?}"-infra-cicd-"${Region:?}" \
+            --s3-bucket "${InfraName:?}"-infra-cicd-"${Region:?}" \
             --s3-prefix artifact/"${EnvironmentName:?}"/"${AppName:?}"
     else
         sam deploy \
@@ -188,7 +188,7 @@ function upload_to_pipeline() {
 
     aws s3 cp \
         .zip/"${AppName:?}"_input.zip \
-        s3://wni-"${InfraName:?}"-infra-cicd-"${Region:?}"/artifact/"${EnvironmentName:?}"/ \
+        s3://"${InfraName:?}"-infra-cicd-"${Region:?}"/artifact/"${EnvironmentName:?}"/ \
         --region "${DeployRegion:?}" \
         --profile "${Profile:?}"
 
@@ -223,7 +223,7 @@ function upload_to_pipeline_s3() {
 
     aws s3 cp \
         .zip/"${AppName:?}"_input.zip \
-        s3://wni-"${InfraName:?}"-infra-cicd-"${Region:?}"/artifact/"${EnvironmentName:?}"/ \
+        s3://"${InfraName:?}"-infra-cicd-"${Region:?}"/artifact/"${EnvironmentName:?}"/ \
         --region "${DeployRegion:?}" \
         --profile "${Profile:?}"
 
@@ -250,7 +250,7 @@ function sync() {
         --region "${DeployRegion:?}" \
         --profile "${Profile:?}" \
         --tags "$_TAGS" \
-        --s3-bucket wni-"${InfraName:?}"-infra-cicd-"${Region:?}" \
+        --s3-bucket "${InfraName:?}"-infra-cicd-"${Region:?}" \
         --s3-prefix artifact/"${EnvironmentName:?}"/"${AppName:?}"
 
     rm -rf .aws-sam

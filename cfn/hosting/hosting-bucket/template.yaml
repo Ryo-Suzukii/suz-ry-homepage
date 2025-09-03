@@ -1,0 +1,98 @@
+AWSTemplateFormatVersion: 2010-09-09
+Transform:
+  - AWS::Serverless-2016-10-31
+  - AWS::LanguageExtensions
+
+Parameters:
+  Region:
+    Type: String
+
+  EnvironmentPrefix:
+    Type: String
+
+  EnvironmentName:
+    Type: String
+
+  InfraName:
+    Type: String
+
+  CategoryName:
+    Type: String
+
+  AppName:
+    Type: String
+
+Resources:
+  Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub ${EnvironmentName}-${AppName}-${Region}
+      LifecycleConfiguration:
+        Rules:
+          - Id: !Sub ${EnvironmentName}-${AppName}-delete-multipart
+            Status: Enabled
+            AbortIncompleteMultipartUpload:
+              DaysAfterInitiation: 1
+          - Id: !Sub ${EnvironmentName}-${AppName}-intelligent-tiering
+            Status: Enabled
+            Transition:
+              StorageClass: INTELLIGENT_TIERING
+              TransitionInDays: 0
+          - Id: !Sub ${EnvironmentName}-${AppName}-cache
+            Status: Enabled
+            ExpirationInDays: 5
+            TagFilters:
+              - Key: ttl
+                Value: cache
+          - Id: !Sub ${EnvironmentName}-${AppName}-short
+            Status: Enabled
+            ExpirationInDays: 15
+            TagFilters:
+              - Key: ttl
+                Value: short
+          - Id: !Sub ${EnvironmentName}-${AppName}-middle
+            Status: Enabled
+            ExpirationInDays: 35
+            TagFilters:
+              - Key: ttl
+                Value: middle
+          - Id: !Sub ${EnvironmentName}-${AppName}-long
+            Status: Enabled
+            ExpirationInDays: 400
+            TagFilters:
+              - Key: ttl
+                Value: long
+      CorsConfiguration:
+        CorsRules:
+          - AllowedOrigins:
+              - "*"
+            AllowedHeaders:
+              - "*"
+            AllowedMethods:
+              - GET
+              - HEAD
+
+  BucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref Bucket
+      PolicyDocument:
+        Statement:
+          - Effect: Allow
+            Action: s3:ListBucket
+            Resource: !Sub arn:aws:s3:::${Bucket}
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Condition:
+              StringLike:
+                AWS:SourceArn: !Sub arn:aws:cloudfront::${AWS::AccountId}:distribution/*
+          - Effect: Allow
+            Action: s3:GetObject
+            Resource: !Sub
+              - ${Bucket}/*
+              - Bucket: !GetAtt Bucket.Arn
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Condition:
+              StringLike:
+                AWS:SourceArn: !Sub arn:aws:cloudfront::${AWS::AccountId}:distribution/*

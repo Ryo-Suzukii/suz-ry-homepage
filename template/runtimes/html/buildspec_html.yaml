@@ -1,10 +1,5 @@
 version: 0.2
 
-env:
-  parameter-store:
-    AUTH0_DOMAIN: /$ENVIRONMENT_NAME/infra-resource/auth0/domain
-    AUTH0_CLIENT_ID: /$ENVIRONMENT_NAME/infra-resource/auth0/client-id
-    AUTH0_IDENTIFIER: /$ENVIRONMENT_NAME/infra-resource/auth0/identifier
 
 phases:
   install:
@@ -16,9 +11,6 @@ phases:
       - aws --version
       - sam --version
       - npm ci
-      - sed -i "s#__AUTH0_DOMAIN__#$AUTH0_DOMAIN#" .env.production
-      - sed -i "s#__AUTH0_CLIENT_ID__#$AUTH0_CLIENT_ID#" .env.production
-      - sed -i "s#__AUTH0_IDENTIFIER__#$AUTH0_IDENTIFIER#" .env.production
   build:
     commands:
       - echo Build `date`

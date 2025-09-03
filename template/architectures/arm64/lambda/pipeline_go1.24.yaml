@@ -92,7 +92,7 @@ Resources:
         Fn::ImportValue: !Sub ${InfraName}-infra-cicd-CodePipelineRole
       ArtifactStore:
         Type: S3
-        Location: !Sub wni-${InfraName}-infra-cicd-${Region}
+        Location: !Sub ${InfraName}-infra-cicd-${Region}
       Stages:
         - Name: Source
           Actions:
@@ -103,7 +103,7 @@ Resources:
                 Version: 1
                 Provider: S3
               Configuration:
-                S3Bucket: !Sub wni-${InfraName}-infra-cicd-${Region}
+                S3Bucket: !Sub ${InfraName}-infra-cicd-${Region}
                 S3ObjectKey: !Sub artifact/${EnvironmentName}/${AppName}_input.zip
                 PollForSourceChanges: false
               OutputArtifacts:

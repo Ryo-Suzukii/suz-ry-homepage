@@ -1,0 +1,51 @@
+AWSTemplateFormatVersion: 2010-09-09
+Transform:
+  - AWS::Serverless-2016-10-31
+  - AWS::LanguageExtensions
+
+Parameters:
+  Region:
+    Type: String
+
+  EnvironmentPrefix:
+    Type: String
+
+  EnvironmentName:
+    Type: String
+
+  InfraName:
+    Type: String
+
+  CategoryName:
+    Type: String
+
+  AppName:
+    Type: String
+
+Resources:
+  PublicKey:
+    Type: AWS::CloudFront::PublicKey
+    Properties:
+      PublicKeyConfig:
+        Name: !Sub ${EnvironmentName}-${AppName}
+        EncodedKey: !Sub "{{resolve:ssm:/${EnvironmentName}/${AppName}/rsa/public}}"
+        CallerReference: !Sub ${EnvironmentName}-${AppName}
+
+  KeyGroup:
+    Type: AWS::CloudFront::KeyGroup
+    Properties:
+      KeyGroupConfig:
+        Name: !Sub ${EnvironmentName}-${AppName}
+        Items:
+          - !Ref PublicKey
+
+Outputs:
+  PublicKey:
+    Value: !Ref PublicKey
+    Export:
+      Name: !Sub ${EnvironmentName}-${AppName}-PublicKey
+
+  KeyGroup:
+    Value: !Ref KeyGroup
+    Export:
+      Name: !Sub ${EnvironmentName}-${AppName}-KeyGroup

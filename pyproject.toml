@@ -12,7 +12,6 @@ known-first-party = ["app", "common"]
 
 [tool.pytest]
 [tool.pytest.ini_options]
-pythonpath = "cfn/layer/layer-python313/src/wni"
 
 [tool.coverage]
 [tool.coverage.run]
