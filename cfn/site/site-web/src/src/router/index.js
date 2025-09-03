@@ -1,25 +1,31 @@
 import { createRouter as baseCreateRouter, createWebHashHistory } from "vue-router"
 
-import Home from "../pages/Home.vue"
-import Login from "../pages/Login.vue"
+import HomePage from "../pages/HomePage.vue"
+import AboutMe from "../pages/AboutMe.vue"
+import AboutSite from "../pages/AboutSite.vue"
+import Portfolio from "../pages/Portfolio.vue"
+import PortfolioDetail from "../pages/PortfolioDetail.vue"
+import Skills from "../pages/Skills.vue"
+import Profile from "../pages/Profile.vue"
+import Contact from "../pages/Contact.vue"
 import NotFound from "../pages/NotFound.vue"
-import { createAuthGuard } from "../plugins/auth/index.js"
 
 function createRouter() {
   const routes = [
-    { name: "login", path: "/login", component: Login },
-    { name: "home", path: "/", component: Home },
+    { name: "home", path: "/", component: HomePage },
+    { name: "about-site", path: "/about-site", component: AboutSite },
+    { name: "about-me", path: "/about-me", component: AboutMe },
+    { name: "portfolio", path: "/portfolio", component: Portfolio },
+    { name: "portfolio-detail", path: "/portfolio/:id", component: PortfolioDetail },
+    { name: "skills", path: "/skills", component: Skills },
+    { name: "profile", path: "/profile", component: Profile },
+    { name: "contact", path: "/contact", component: Contact },
     { name: "not-found", path: "/:pathMatch(.*)*", component: NotFound },
   ]
-  const ignoreRoutes = ["login", "not-found"]
 
-  const guard = createAuthGuard()
   const router = baseCreateRouter({ routes, history: createWebHashHistory() })
   router.beforeEach((to) => {
-    if (ignoreRoutes.includes(to.name)) {
-      return
-    }
-    return guard()
+    return
   })
 
   return router

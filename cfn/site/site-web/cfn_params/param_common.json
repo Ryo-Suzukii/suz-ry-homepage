@@ -1,6 +1,6 @@
 {
   "Parameters": {
-    "Target": "public/web",
+    "Target": "public/portfolio",
     "TTL": "600"
   }
 }
