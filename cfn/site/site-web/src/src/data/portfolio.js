@@ -1,11 +1,6 @@
-import spaceExplorer from './portfolios/space-explorer.js'
-import aiChatPlatform from './portfolios/ai-chat-platform.js'
-import blockchainAnalytics from './portfolios/blockchain-analytics.js'
+
 
 const portfolioData = [
-  spaceExplorer,
-  aiChatPlatform,
-  blockchainAnalytics
 ]
 
 export function getPortfolioById(id) {

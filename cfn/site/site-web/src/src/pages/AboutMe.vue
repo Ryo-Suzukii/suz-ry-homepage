@@ -156,7 +156,7 @@ const experiences = [
   {
     period: '2024 - Present',
     title: 'Full Stack Engineer',
-    description: '新卒でIT企業に入社。主にLLMを活用したWebアプリケーションの設計・開発・運用を担当。AWSを用いたインフラ構築から課題解決まで幅広く経験。',
+    description: '新卒でプライム上場IT企業に入社。主にLLMを活用した社内業務効率化アプリケーション、SaaSアプリケーションの設計・開発・運用を担当。AWSを用いたインフラ構築から課題解決まで幅広く経験。',
     technologies: ['Python', 'FastAPI', 'Vue.js', 'AWS', 'Docker', 'Kubernetes', 'CI/CD', 'LangChain', "LangGraph"],
     icon: '💼'
   }
