@@ -266,35 +266,209 @@ function initThreeJS() {
 }
 
 function createStarField() {
+  // 通常の星
   const starGeometry = new THREE.BufferGeometry()
-  const starCount = 2000
+  const starCount = 3000
   const positions = new Float32Array(starCount * 3)
   const colors = new Float32Array(starCount * 3)
+  const sizes = new Float32Array(starCount)
 
   for (let i = 0; i < starCount; i++) {
-    positions[i * 3] = (Math.random() - 0.5) * 4000
-    positions[i * 3 + 1] = (Math.random() - 0.5) * 4000
-    positions[i * 3 + 2] = (Math.random() - 0.5) * 4000
+    // より広範囲に星を配置
+    positions[i * 3] = (Math.random() - 0.5) * 6000
+    positions[i * 3 + 1] = (Math.random() - 0.5) * 6000
+    positions[i * 3 + 2] = (Math.random() - 0.5) * 6000
 
+    // より多彩な色合いの星
     const color = new THREE.Color()
-    color.setHSL(Math.random() * 0.2 + 0.5, 0.55, Math.random() * 0.25 + 0.55)
+    const hue = Math.random()
+    if (Math.random() > 0.8) {
+      // 20%の確率で特別な色の星（青、赤、オレンジ）
+      color.setHSL(Math.random() > 0.5 ? 0.6 : Math.random() > 0.5 ? 0.05 : 0.1, 0.8, 0.9)
+    } else {
+      // 通常の白い星
+      color.setHSL(0.1, 0.1, Math.random() * 0.4 + 0.6)
+    }
+    
     colors[i * 3] = color.r
     colors[i * 3 + 1] = color.g
     colors[i * 3 + 2] = color.b
+    
+    // サイズを変化させる
+    sizes[i] = Math.random() * 3 + 0.5
   }
 
   starGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3))
   starGeometry.setAttribute('color', new THREE.BufferAttribute(colors, 3))
+  starGeometry.setAttribute('size', new THREE.BufferAttribute(sizes, 1))
   
   const starMaterial = new THREE.PointsMaterial({
     size: 2,
     vertexColors: true,
     transparent: true,
-    opacity: 0.8
+    opacity: 0.9,
+    sizeAttenuation: true
   })
 
   stars = new THREE.Points(starGeometry, starMaterial)
   scene.add(stars)
+
+  // 輝く星座を追加
+  createBrightStars()
+  
+  // 銀河系の渦を追加
+  createGalaxySpiral()
+  
+  // 流れ星を追加
+  createShootingStars()
+}
+
+function createBrightStars() {
+  // 特別に明るい星を追加
+  const brightStarCount = 50
+  const brightGeometry = new THREE.BufferGeometry()
+  const brightPositions = new Float32Array(brightStarCount * 3)
+  const brightColors = new Float32Array(brightStarCount * 3)
+
+  for (let i = 0; i < brightStarCount; i++) {
+    brightPositions[i * 3] = (Math.random() - 0.5) * 5000
+    brightPositions[i * 3 + 1] = (Math.random() - 0.5) * 5000
+    brightPositions[i * 3 + 2] = (Math.random() - 0.5) * 5000
+
+    const color = new THREE.Color()
+    // ブルー、ゴールド、レッドの明るい星
+    const colorType = Math.random()
+    if (colorType < 0.4) {
+      color.setHSL(0.6, 0.8, 1.0) // ブルー
+    } else if (colorType < 0.7) {
+      color.setHSL(0.15, 0.8, 1.0) // ゴールド
+    } else {
+      color.setHSL(0.0, 0.8, 1.0) // レッド
+    }
+    
+    brightColors[i * 3] = color.r
+    brightColors[i * 3 + 1] = color.g
+    brightColors[i * 3 + 2] = color.b
+  }
+
+  brightGeometry.setAttribute('position', new THREE.BufferAttribute(brightPositions, 3))
+  brightGeometry.setAttribute('color', new THREE.BufferAttribute(brightColors, 3))
+  
+  const brightMaterial = new THREE.PointsMaterial({
+    size: 8,
+    vertexColors: true,
+    transparent: true,
+    opacity: 0.8,
+    sizeAttenuation: true
+  })
+
+  const brightStars = new THREE.Points(brightGeometry, brightMaterial)
+  scene.add(brightStars)
+  
+  // アニメーション用に追加
+  planets.push(brightStars)
+}
+
+function createGalaxySpiral() {
+  // 銀河系の渦状構造
+  const spiralGeometry = new THREE.BufferGeometry()
+  const spiralCount = 1000
+  const spiralPositions = new Float32Array(spiralCount * 3)
+  const spiralColors = new Float32Array(spiralCount * 3)
+
+  for (let i = 0; i < spiralCount; i++) {
+    const angle = (i / spiralCount) * Math.PI * 4 // 2回転
+    const radius = (i / spiralCount) * 1500 + 200
+    const height = (Math.random() - 0.5) * 100
+
+    spiralPositions[i * 3] = Math.cos(angle) * radius
+    spiralPositions[i * 3 + 1] = height
+    spiralPositions[i * 3 + 2] = Math.sin(angle) * radius
+
+    // 銀河中心に向かって色を変化
+    const color = new THREE.Color()
+    const distanceRatio = i / spiralCount
+    if (distanceRatio < 0.3) {
+      color.setHSL(0.15, 0.9, 0.9) // 中心部はゴールド
+    } else if (distanceRatio < 0.6) {
+      color.setHSL(0.6, 0.7, 0.8) // 中間部はブルー
+    } else {
+      color.setHSL(0.65, 0.5, 0.7) // 外側は薄いブルー
+    }
+    
+    spiralColors[i * 3] = color.r
+    spiralColors[i * 3 + 1] = color.g
+    spiralColors[i * 3 + 2] = color.b
+  }
+
+  spiralGeometry.setAttribute('position', new THREE.BufferAttribute(spiralPositions, 3))
+  spiralGeometry.setAttribute('color', new THREE.BufferAttribute(spiralColors, 3))
+  
+  const spiralMaterial = new THREE.PointsMaterial({
+    size: 3,
+    vertexColors: true,
+    transparent: true,
+    opacity: 0.6,
+    sizeAttenuation: true
+  })
+
+  const spiralStars = new THREE.Points(spiralGeometry, spiralMaterial)
+  spiralStars.rotation.x = Math.PI / 6 // 少し傾ける
+  scene.add(spiralStars)
+  
+  // アニメーション用に追加
+  planets.push(spiralStars)
+}
+
+function createShootingStars() {
+  // 流れ星用の線分を作成
+  const shootingStarCount = 8
+  
+  for (let i = 0; i < shootingStarCount; i++) {
+    const geometry = new THREE.BufferGeometry()
+    const positions = new Float32Array(6) // 2点の座標
+    
+    // ランダムな開始位置
+    const startX = (Math.random() - 0.5) * 4000
+    const startY = (Math.random() - 0.5) * 4000
+    const startZ = (Math.random() - 0.5) * 4000
+    
+    // 流れ星の軌跡の長さ
+    const trailLength = 200
+    const direction = new THREE.Vector3(
+      (Math.random() - 0.5) * 2,
+      (Math.random() - 0.5) * 2,
+      (Math.random() - 0.5) * 2
+    ).normalize()
+    
+    positions[0] = startX
+    positions[1] = startY  
+    positions[2] = startZ
+    positions[3] = startX + direction.x * trailLength
+    positions[4] = startY + direction.y * trailLength
+    positions[5] = startZ + direction.z * trailLength
+    
+    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3))
+    
+    const material = new THREE.LineBasicMaterial({
+      color: Math.random() > 0.5 ? 0xffffff : 0x88ccff,
+      transparent: true,
+      opacity: 0.8
+    })
+    
+    const shootingStar = new THREE.Line(geometry, material)
+    
+    // ランダムな移動速度とフェードアウト時間を設定
+    shootingStar.userData = {
+      speed: Math.random() * 10 + 5,
+      direction: direction.clone(),
+      fadeTime: Math.random() * 3000 + 2000, // 2-5秒でフェード
+      startTime: Date.now() + Math.random() * 5000 // 0-5秒後に開始
+    }
+    
+    scene.add(shootingStar)
+    planets.push(shootingStar)
+  }
 }
 
 function createPlanets() {
@@ -364,15 +538,71 @@ function handleScroll() {
 function animate() {
   animationId = requestAnimationFrame(animate)
   
+  const time = Date.now() * 0.001
+  
   if (stars) {
-    stars.rotation.y += 0.0002
+    // 星全体をゆっくりと回転
+    stars.rotation.y += 0.0003
+    stars.rotation.x += 0.0001
   }
 
   planets.forEach((planet, index) => {
-    planet.rotation.y += 0.001 + index * 0.0005
-    
-    // 浮遊効果
-    planet.position.y += Math.sin(Date.now() * 0.001 + index) * 0.1
+    if (planet.geometry && planet.geometry.attributes.position) {
+      // 惑星の回転
+      planet.rotation.y += 0.002 + index * 0.001
+      planet.rotation.x += 0.001
+      
+      // 浮遊効果（より複雑な動き）
+      planet.position.y += Math.sin(time * 0.5 + index) * 0.2
+      planet.position.x += Math.cos(time * 0.3 + index) * 0.1
+      
+      // 特定の星（明るい星や銀河）により複雑な動きを追加
+      if (index >= planetData.length) {
+        // 明るい星や銀河の場合
+        planet.rotation.z += 0.002
+        
+        // 明るい星の瞬き効果
+        if (planet.material && planet.material.opacity !== undefined) {
+          planet.material.opacity = 0.4 + Math.sin(time * 3 + index) * 0.4
+        }
+        
+        // 流れ星のアニメーション
+        if (planet.userData && planet.userData.speed) {
+          const currentTime = Date.now()
+          
+          if (currentTime > planet.userData.startTime) {
+            // 流れ星を移動
+            planet.position.add(planet.userData.direction.clone().multiplyScalar(planet.userData.speed))
+            
+            // フェードアウト効果
+            const elapsed = currentTime - planet.userData.startTime
+            const fadeProgress = Math.min(elapsed / planet.userData.fadeTime, 1)
+            
+            if (planet.material) {
+              planet.material.opacity = Math.max(0, 0.8 * (1 - fadeProgress))
+            }
+            
+            // 完全にフェードアウトしたらリセット
+            if (fadeProgress >= 1) {
+              // 新しい位置にリセット
+              planet.position.set(
+                (Math.random() - 0.5) * 4000,
+                (Math.random() - 0.5) * 4000,
+                (Math.random() - 0.5) * 4000
+              )
+              planet.userData.startTime = currentTime + Math.random() * 10000 // 0-10秒後に再開
+              if (planet.material) {
+                planet.material.opacity = 0.8
+              }
+            }
+          }
+        }
+      }
+    } else {
+      // 通常の惑星
+      planet.rotation.y += 0.001 + index * 0.0005
+      planet.position.y += Math.sin(time + index) * 0.1
+    }
   })
 
   renderer.render(scene, camera)

@@ -224,14 +224,8 @@ const contactMethods = [
   {
     type: 'Email',
     icon: '📧',
-    value: 'contact@example.com',
+    value: 'astronautryosuzuki@gmail.com',
     description: '24時間以内に返信します'
-  },
-  {
-    type: 'Discord',
-    icon: '💬',
-    value: 'username#1234',
-    description: '技術的な質問はこちらが早いです'
   },
   {
     type: 'Location',
@@ -242,10 +236,10 @@ const contactMethods = [
 ]
 
 const socialLinks = [
-  { name: 'GitHub', icon: '🐙', url: 'https://github.com/username' },
-  { name: 'Twitter', icon: '🐦', url: 'https://twitter.com/username' },
-  { name: 'LinkedIn', icon: '💼', url: 'https://linkedin.com/in/username' },
-  { name: 'Qiita', icon: '📝', url: 'https://qiita.com/username' }
+  { name: 'GitHub', icon: '🐙', url: 'https://github.com/ryo-suzukii' },
+  { name: 'Twitter', icon: '🐦', url: 'https://twitter.com/Hayaa_6211' },
+  { name: 'Qiita', icon: '📝', url: 'https://qiita.com/Hayaa6211' },
+  { name: 'zenn', icon: '📘', url: 'https://zenn.dev/ha' },
 ]
 
 const services = [

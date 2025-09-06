@@ -205,38 +205,11 @@ const skillCategories = [
         name: 'Vue.js / Nuxt.js',
         icon: '💚',
         level: 95,
-        experience: '4年',
+        experience: '2年',
         color: 'bg-gradient-to-r from-green-400 to-green-600',
         description: 'コンポーネント設計からSSRまで幅広く対応。Composition APIを活用した現代的な開発スタイル。',
         projects: ['ポートフォリオサイト', 'ECサイト', 'ダッシュボード']
       },
-      {
-        name: 'React / Next.js',
-        icon: '⚛️',
-        level: 90,
-        experience: '3年',
-        color: 'bg-gradient-to-r from-blue-400 to-blue-600',
-        description: 'Hooksを活用したモダンなReact開発。TypeScriptとの組み合わせで型安全な開発を実践。',
-        projects: ['AIチャットプラットフォーム', 'SaaSアプリ']
-      },
-      {
-        name: 'TypeScript',
-        icon: '💙',
-        level: 88,
-        experience: '3年',
-        color: 'bg-gradient-to-r from-blue-500 to-indigo-600',
-        description: '型安全な開発によりバグを事前に防止。複雑なアプリケーションでも保守性を確保。',
-        projects: ['全プロジェクトで採用']
-      },
-      {
-        name: 'Three.js / WebGL',
-        icon: '🎮',
-        level: 85,
-        experience: '2年',
-        color: 'bg-gradient-to-r from-purple-400 to-purple-600',
-        description: '3Dグラフィックスと物理演算を組み合わせたインタラクティブな体験の創出。',
-        projects: ['宇宙探査シミュレーター', 'ポートフォリオサイト']
-      }
     ]
   },
   {
@@ -245,28 +218,19 @@ const skillCategories = [
     description: 'サーバーサイド開発・API設計',
     skills: [
       {
-        name: 'Node.js / Express',
-        icon: '🟢',
-        level: 90,
-        experience: '4年',
-        color: 'bg-gradient-to-r from-green-500 to-green-700',
-        description: 'RESTful APIからGraphQLまで。マイクロサービスアーキテクチャの設計・実装。',
-        projects: ['API Gateway', 'リアルタイムチャット']
-      },
-      {
         name: 'Python / FastAPI',
         icon: '🐍',
         level: 85,
-        experience: '3年',
+        experience: '6年',
         color: 'bg-gradient-to-r from-yellow-400 to-yellow-600',
         description: 'データ分析APIや機械学習モデルのデプロイ。非同期処理による高性能API開発。',
         projects: ['データ分析API', 'AIサービス']
       },
       {
-        name: 'PostgreSQL / MongoDB',
+        name: 'PostgreSQL',
         icon: '🐘',
         level: 80,
-        experience: '3年',
+        experience: '2年',
         color: 'bg-gradient-to-r from-blue-600 to-indigo-700',
         description: 'リレーショナルDB設計からNoSQLの活用まで。パフォーマンスチューニングも対応。',
         projects: ['ECサイト', 'ユーザー管理システム']
@@ -321,53 +285,34 @@ const skillCategories = [
         description: 'ユーザー中心設計によるインターフェース設計。使いやすさと美しさの両立。',
         projects: ['全プロジェクトで設計から参加']
       },
-      {
-        name: 'Figma / Adobe XD',
-        icon: '🎨',
-        level: 85,
-        experience: '3年',
-        color: 'bg-gradient-to-r from-purple-500 to-pink-500',
-        description: 'プロトタイピングからデザインシステム構築まで。チーム協業ツールとして活用。',
-        projects: ['デザインシステム', 'プロトタイプ制作']
-      }
     ]
   }
 ]
 
 const certifications = [
-  { name: 'AWS Certified Solutions Architect', issuer: 'Amazon Web Services', date: '2023', icon: '☁️' },
-  { name: 'Google Cloud Professional', issuer: 'Google Cloud', date: '2023', icon: '🌐' },
-  { name: 'Vue.js Certified Developer', issuer: 'Vue.js Foundation', date: '2022', icon: '💚' },
-  { name: 'Scrum Master Certified', issuer: 'Scrum Alliance', date: '2022', icon: '🏃‍♂️' }
+  { name: 'AWS Cloud Practitioner', issuer: 'Amazon Web Services', date: '2023', icon: '☁️' },
 ]
 
 const currentLearning = [
   { name: 'Rust', icon: '🦀', progress: 65 },
-  { name: 'WebAssembly', icon: '⚡', progress: 45 },
-  { name: 'Machine Learning', icon: '🤖', progress: 35 },
-  { name: 'Blockchain', icon: '⛓️', progress: 25 }
 ]
 
 const devTools = [
   {
     category: 'エディタ・IDE',
-    tools: ['VS Code', 'WebStorm', 'Vim']
+    tools: ['VS Code']
   },
   {
     category: 'バージョン管理',
-    tools: ['Git', 'GitHub', 'GitLab', 'Bitbucket']
+    tools: ['Git', 'GitHub']
   },
   {
     category: 'デザインツール',
-    tools: ['Figma', 'Adobe XD', 'Sketch', 'Photoshop']
+    tools: ['Figma']
   },
   {
     category: 'プロジェクト管理',
-    tools: ['Jira', 'Notion', 'Slack', 'Discord']
-  },
-  {
-    category: 'テスト・分析',
-    tools: ['Jest', 'Cypress', 'Google Analytics', 'Lighthouse']
+    tools: ['Notion', 'Slack', 'backlog']
   },
   {
     category: 'その他',

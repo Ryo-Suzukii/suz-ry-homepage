@@ -140,25 +140,25 @@ let scene, camera, renderer, constellation, animationId
 
 const experiences = [
   {
-    period: '2020 - 現在',
-    title: 'Full Stack Engineer',
-    description: 'スタートアップから大企業まで様々な規模のプロジェクトでフルスタック開発を担当。特にWebアプリケーションの設計・開発・運用に従事。',
-    technologies: ['Vue.js', 'React', 'Node.js', 'Python', 'AWS', 'Docker'],
-    icon: '🚀'
-  },
-  {
-    period: '2019 - 2020',
-    title: 'Frontend Developer',
-    description: 'ユーザーインターフェースの設計・実装に特化。レスポンシブデザインやアクセシビリティを重視したWebアプリケーション開発。',
-    technologies: ['JavaScript', 'Vue.js', 'Sass', 'Webpack', 'Figma'],
-    icon: '🎨'
-  },
-  {
-    period: '2018 - 2019',
-    title: 'Junior Developer',
-    description: 'プログラミングの基礎からWeb開発まで幅広く学習。チーム開発やアジャイル開発手法を習得。',
-    technologies: ['HTML', 'CSS', 'JavaScript', 'PHP', 'MySQL'],
+    period: '- 2020',
+    title: 'Hobby Engineer',
+    description: 'フリー動画編集ソフト使用中にJavaScriptの存在を知り、独学でプログラミングを学び始める。Webサイト制作や簡単なツール開発を趣味で行う。',
+    technologies: ['HTML', 'CSS', 'JavaScript', 'AviUtl'],
     icon: '📚'
+  },
+  {
+    period: '2020 - 2024',
+    title: 'University Student',
+    description: 'Computer Scienceを専攻し、AI、データベース、ネットワーク、セキュリティなど幅広く学習。学内プロジェクトでチームリーダーを務め、卒業研究では雲量予測モデルを開発。',
+    technologies: ['Python', 'TensorFlow', 'PostgreSQL', 'Git', 'Linux'],
+    icon: '🎓'
+  },
+  {
+    period: '2024 - Present',
+    title: 'Full Stack Engineer',
+    description: '新卒でIT企業に入社。主にLLMを活用したWebアプリケーションの設計・開発・運用を担当。AWSを用いたインフラ構築から課題解決まで幅広く経験。',
+    technologies: ['Python', 'FastAPI', 'Vue.js', 'AWS', 'Docker', 'Kubernetes', 'CI/CD', 'LangChain', "LangGraph"],
+    icon: '💼'
   }
 ]
 
@@ -167,19 +167,15 @@ const skillCategories = [
     title: 'Frontend',
     icon: '🎨',
     skills: [
-      { name: 'Vue.js/Nuxt.js', level: 95 },
-      { name: 'React/Next.js', level: 90 },
-      { name: 'TypeScript', level: 88 },
-      { name: 'Three.js/WebGL', level: 85 }
+      { name: 'Vue.js', level: 60 },
     ]
   },
   {
     title: 'Backend',
     icon: '⚙️',
     skills: [
-      { name: 'Node.js/Express', level: 90 },
       { name: 'Python/FastAPI', level: 85 },
-      { name: 'PostgreSQL/MongoDB', level: 80 },
+      { name: 'PostgreSQL/MongoDB', level: 70 },
       { name: 'Redis/Elasticsearch', level: 75 }
     ]
   },
@@ -188,19 +184,8 @@ const skillCategories = [
     icon: '☁️',
     skills: [
       { name: 'AWS/GCP', level: 85 },
-      { name: 'Docker/Kubernetes', level: 80 },
+      { name: 'Docker/Kubernetes', level: 70 },
       { name: 'CI/CD', level: 85 },
-      { name: 'Terraform', level: 70 }
-    ]
-  },
-  {
-    title: 'Design/UX',
-    icon: '🎯',
-    skills: [
-      { name: 'UI/UX Design', level: 80 },
-      { name: 'Figma/Adobe XD', level: 85 },
-      { name: 'Responsive Design', level: 90 },
-      { name: 'Accessibility', level: 85 }
     ]
   }
 ]
@@ -212,24 +197,9 @@ const hobbies = [
     description: '宇宙の神秘に魅力を感じ、天体観測や宇宙関連の学習を趣味としています。'
   },
   {
-    icon: '🎮',
-    title: 'ゲーム開発',
-    description: '個人プロジェクトとしてインディーゲームの開発に取り組んでいます。'
-  },
-  {
     icon: '📖',
     title: '技術書読書',
     description: '最新の技術トレンドをキャッチアップするため、技術書を読むことが日課です。'
-  },
-  {
-    icon: '🎵',
-    title: '音楽制作',
-    description: 'DTMソフトを使った楽曲制作で創造性を養っています。'
-  },
-  {
-    icon: '🏃‍♂️',
-    title: 'ランニング',
-    description: '健康維持とリフレッシュのため、定期的にランニングを行っています。'
   },
   {
     icon: '✈️',
