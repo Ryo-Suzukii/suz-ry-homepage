@@ -1,0 +1,32 @@
+export const careerData = [
+  {
+    id: 1,
+    period: '- 2020',
+    role: 'Hobby Engineer',
+    company: 'Self-taught',
+    type: 'hobby',
+    description: 'Python・Web技術を独学。小さなツールやスクリプトを書きながらエンジニアリングの楽しさを発見した時期。',
+    tags: ['Python', 'HTML/CSS', 'JavaScript'],
+    icon: '🔧',
+  },
+  {
+    id: 2,
+    period: '2020 - 2024',
+    role: 'University Student',
+    company: '大学',
+    type: 'education',
+    description: '情報系の学科で基礎からアルゴリズム・ネットワーク・データベースを学ぶ。研究と個人開発を並行して進めた。',
+    tags: ['Python', 'Java', 'Algorithms', 'Networks'],
+    icon: '🎓',
+  },
+  {
+    id: 3,
+    period: '2024 - Present',
+    role: 'Full Stack Engineer',
+    company: 'BtoB SaaS',
+    type: 'work',
+    description: '海運向けBtoB SaaSアプリにてビジネスデータ分析基盤の構築、およびそれを活用したAI Agentの開発を担当。フロントエンドからインフラまでフルスタックで関与。AWSサーバーレスアーキテクチャを設計・実装。',
+    tags: ['Vue.js', 'Python', 'FastAPI', 'AWS', 'AI Agent'],
+    icon: '⚡',
+  },
+]
