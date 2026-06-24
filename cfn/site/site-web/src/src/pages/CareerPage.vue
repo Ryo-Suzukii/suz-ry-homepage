@@ -1,6 +1,6 @@
 <template>
-  <div class="min-h-screen pt-24 pb-20 px-6" style="background: var(--bg);">
-    <div class="max-w-3xl mx-auto">
+  <div class="min-h-screen pt-28 pb-20 px-6" style="background: var(--bg);">
+    <div class="max-w-4xl mx-auto">
 
       <!-- Header -->
       <div class="mb-16 reveal" ref="header">
@@ -148,27 +148,17 @@ onMounted(() => {
   const observer = new IntersectionObserver(
     entries => {
       entries.forEach(e => {
-        if (e.isIntersecting) e.target.classList.add('visible')
+        if (e.isIntersecting) { e.target.classList.add('visible'); observer.unobserve(e.target) }
       })
     },
-    { threshold: 0.1, rootMargin: '0px 0px -40px 0px' }
+    { threshold: 0.05, rootMargin: '0px 0px -20px 0px' }
   )
-  document.querySelectorAll('.reveal').forEach(el => observer.observe(el))
+  requestAnimationFrame(() => {
+    document.querySelectorAll('.reveal').forEach(el => observer.observe(el))
+  })
 
-  const barObserver = new IntersectionObserver(
-    entries => {
-      if (entries[0].isIntersecting) {
-        barsVisible.value = true
-        barObserver.disconnect()
-      }
-    },
-    { threshold: 0.3 }
-  )
-  const skillSection = document.querySelector('.skill-bar')?.closest('.glass')
-  if (skillSection) barObserver.observe(skillSection)
-
-  // Fallback: show bars after 1s
-  setTimeout(() => { barsVisible.value = true }, 1200)
+  // show bars after short delay
+  setTimeout(() => { barsVisible.value = true }, 800)
 })
 </script>
 

@@ -16,59 +16,50 @@
           </div>
 
           <!-- Terminal body -->
-          <div class="p-6 md:p-8" style="font-family: 'JetBrains Mono', monospace; min-height: 320px;">
-            <div class="space-y-4">
-              <div class="text-sm">
-                <span style="color: var(--cyan);">ryo</span>
-                <span style="color: var(--text-muted);">@</span>
-                <span style="color: var(--violet-light);">suz-ry</span>
-                <span style="color: var(--text-muted);"> % </span>
-                <span style="color: var(--text);">{{ typedCommand }}</span>
-                <span v-if="!commandDone" class="animate-blink" style="color: var(--cyan);">▊</span>
+          <div
+            ref="terminalBody"
+            class="p-5 md:p-6 overflow-y-auto"
+            style="font-family: 'JetBrains Mono', monospace; min-height: 340px; max-height: 60vh;"
+            @click="focusInput"
+          >
+            <!-- Command history -->
+            <div v-for="(entry, i) in history" :key="i" class="mb-2">
+              <!-- Command line -->
+              <div class="text-sm flex items-start gap-1">
+                <span class="shrink-0">
+                  <span style="color: var(--cyan);">ryo</span>
+                  <span style="color: var(--text-muted);">@suz-ry % </span>
+                </span>
+                <span style="color: var(--text);">{{ entry.cmd }}</span>
               </div>
+              <!-- Output -->
+              <div v-if="entry.output" class="mt-1 text-sm" v-html="entry.output" />
+            </div>
 
-              <Transition name="output">
-                <div v-if="showOutput" class="space-y-4">
-                  <div>
-                    <p class="text-xs mb-1" style="color: var(--text-muted);">NAME</p>
-                    <p class="font-display font-bold gradient-text leading-tight" style="font-size: clamp(2rem, 6vw, 3.5rem);">Ryo Suzuki</p>
-                  </div>
-
-                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-xs">
-                    <div><span style="color: var(--text-muted);">ROLE    </span><span style="color: var(--text);">Full Stack Engineer</span></div>
-                    <div><span style="color: var(--text-muted);">LOC     </span><span style="color: var(--text);">Tokyo, Japan</span></div>
-                    <div><span style="color: var(--text-muted);">ORG     </span><span style="color: var(--amber);">Weathernews Inc.</span></div>
-                    <div><span style="color: var(--text-muted);">STACK   </span><span style="color: var(--cyan);">AWS · Vue.js · Python</span></div>
-                  </div>
-
-                  <div class="text-xs">
-                    <span style="color: var(--text-muted);">INTERESTS </span>
-                    <span style="color: var(--violet-light);">天体観測 · ゲーム · 旅行 · 技術書</span>
-                  </div>
-
-                  <div class="flex gap-3 pt-1 text-xs">
-                    <a
-                      v-for="link in socialLinks"
-                      :key="link.label"
-                      :href="link.url"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      class="transition-colors duration-200 hover:text-white"
-                      style="color: var(--text-muted);"
-                    >{{ link.label }}</a>
-                  </div>
-
-                  <div>
-                    <span style="color: var(--text-muted);">$ </span>
-                    <span class="animate-blink" style="color: var(--cyan);">▊</span>
-                  </div>
-                </div>
-              </Transition>
+            <!-- Current input line -->
+            <div class="text-sm flex items-center gap-1" v-if="!booting">
+              <span class="shrink-0">
+                <span style="color: var(--cyan);">ryo</span>
+                <span style="color: var(--text-muted);">@suz-ry % </span>
+              </span>
+              <span style="color: var(--text);">{{ currentInput }}</span>
+              <span class="animate-blink" style="color: var(--cyan);">▊</span>
+              <input
+                ref="inputRef"
+                v-model="currentInput"
+                class="absolute opacity-0 w-0 h-0"
+                autocomplete="off"
+                spellcheck="false"
+                @keydown.enter="runCommand"
+                @keydown.up.prevent="historyUp"
+                @keydown.down.prevent="historyDown"
+                @keydown.tab.prevent="tabComplete"
+              />
             </div>
           </div>
         </div>
 
-        <p class="text-center text-xs mt-8 animate-fade-in delay-800" style="color: var(--text-dim);">
+        <p class="text-center text-xs mt-6" style="color: var(--text-dim);">
           scroll to explore ↓
         </p>
       </div>
@@ -143,35 +134,169 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
-import { RouterLink } from 'vue-router'
+import { ref, nextTick, onMounted, onUnmounted } from 'vue'
+import { RouterLink, useRouter } from 'vue-router'
 import * as THREE from 'three'
 
 const canvas = ref(null)
-const typedCommand = ref('')
-const commandDone = ref(false)
-const showOutput = ref(false)
+const terminalBody = ref(null)
+const inputRef = ref(null)
+const currentInput = ref('')
+const booting = ref(true)
+const history = ref([])
+const cmdHistory = ref([])
+const cmdHistoryIdx = ref(-1)
+const router = useRouter()
 
-const command = './ryo --introduce'
+// Command definitions
+const COMMANDS = {
+  whoami: () => `<span style="color: var(--cyan);">ryo</span> — Full Stack Engineer @ Tokyo`,
+  pwd: () => `<span style="color: var(--violet-light);">/home/ryo/suz-ry</span>`,
+  ls: () => `<span style="color: var(--cyan);">career</span>  <span style="color: var(--cyan);">products</span>  <span style="color: var(--cyan);">setup</span>  <span style="color: var(--cyan);">games</span>  <span style="color: var(--violet-light);">lab</span>  <span style="color: var(--text-muted);">about.txt</span>`,
+  date: () => `<span style="color: var(--text-muted);">${new Date().toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })} JST</span>`,
+  'cat about.txt': () => `<span style="color: var(--text-muted);">Name:    </span><span style="color: var(--text);">Ryo Suzuki</span>\n<span style="color: var(--text-muted);">Role:    </span><span style="color: var(--text);">Full Stack Engineer</span>\n<span style="color: var(--text-muted);">Location:</span><span style="color: var(--text);"> Tokyo, Japan</span>\n<span style="color: var(--text-muted);">Stack:   </span><span style="color: var(--cyan);">Vue.js · Python · AWS</span>\n<span style="color: var(--text-muted);">Hobbies: </span><span style="color: var(--violet-light);">天体観測 · ゲーム · 旅行</span>`,
+  sl: () => `<span style="color: var(--amber);">      ====        ________                ___________</span>\n<span style="color: var(--amber);">  _D _|  |_______/        \\__I_I_____===__|_________|</span>\n<span style="color: var(--amber);">   |(_)---  |   H\\________/ |   |        =|___ ___|</span>\n<span style="color: var(--amber);">   /     |  |   H  |  |     |   |         ||_| |_||</span>\n<span style="color: var(--amber);">  |      |  |   H  |__--------------------| [___] |</span>\n<span style="color: var(--amber);">  | ________|___H__/__|_____/[][]~\\_______|       |</span>\n<span style="color: var(--amber);">  |/ |   |-----------I_____I [][] []  D   |=======|__</span>\n<span style="color: var(--cyan);">__/ =| o |=-~~\\  /~~\\  /~~\\  /~~\\ ____Y___________|__</span>\n<span style="color: var(--cyan);">" | |   |  <span style="color: var(--green);">O</span> | |  <span style="color: var(--green);">O</span> | |  <span style="color: var(--green);">O</span> | |  <span style="color: var(--green);">O</span> |          ||</span>\n<span style="color: var(--cyan);">  \\_____/  \\_____/ \\_____/ \\_____/</span>`,
+  uname: () => `<span style="color: var(--text);">Darwin suz-ry 25.0.0 Darwin Kernel Version 25.0.0 arm64</span>`,
+  help: () => `<span style="color: var(--violet-light);">Available commands:</span>\n  <span style="color: var(--cyan);">whoami</span>       who is ryo?\n  <span style="color: var(--cyan);">ls</span>           list pages\n  <span style="color: var(--cyan);">cd &lt;page&gt;</span>    navigate to page\n  <span style="color: var(--cyan);">cat about.txt</span> read about file\n  <span style="color: var(--cyan);">date</span>         current time\n  <span style="color: var(--cyan);">pwd</span>          current path\n  <span style="color: var(--cyan);">uname</span>        system info\n  <span style="color: var(--cyan);">sl</span>           steam locomotive\n  <span style="color: var(--cyan);">clear</span>        clear terminal\n  <span style="color: var(--cyan);">help</span>         show this help`,
+  clear: () => null,
+}
 
-const socialLinks = [
-  { label: 'github', url: 'https://github.com/ryo-suzukii' },
-  { label: 'twitter', url: 'https://twitter.com/Hayaa_6211' },
-  { label: 'zenn', url: 'https://zenn.dev/ha' },
-  { label: 'qiita', url: 'https://qiita.com/Hayaa6211' },
+const PAGE_MAP = {
+  career: '/career',
+  products: '/products',
+  setup: '/setup',
+  games: '/games',
+  lab: '/lab',
+  home: '/',
+  '~': '/',
+}
+
+function parseCommand(input) {
+  const trimmed = input.trim()
+  if (!trimmed) return null
+
+  // cd command
+  const cdMatch = trimmed.match(/^cd\s+(.+)$/)
+  if (cdMatch) {
+    const target = cdMatch[1].trim()
+    const route = PAGE_MAP[target]
+    if (route) {
+      return { output: `<span style="color: var(--green);">Navigating to /${target}...</span>`, navigate: route }
+    }
+    return { output: `<span style="color: #ef4444;">cd: ${target}: No such page</span>` }
+  }
+
+  if (COMMANDS[trimmed] !== undefined) {
+    return { output: COMMANDS[trimmed]() }
+  }
+
+  return { output: `<span style="color: #ef4444;">command not found: ${trimmed}</span>` }
+}
+
+async function runCommand() {
+  const cmd = currentInput.value.trim()
+  if (!cmd) return
+
+  cmdHistory.value.unshift(cmd)
+  cmdHistoryIdx.value = -1
+
+  if (cmd === 'clear') {
+    history.value = []
+    currentInput.value = ''
+    return
+  }
+
+  const result = parseCommand(cmd)
+  history.value.push({ cmd, output: result?.output || null })
+  currentInput.value = ''
+
+  await nextTick()
+  scrollToBottom()
+
+  if (result?.navigate) {
+    setTimeout(() => router.push(result.navigate), 600)
+  }
+}
+
+function historyUp() {
+  if (cmdHistoryIdx.value < cmdHistory.value.length - 1) {
+    cmdHistoryIdx.value++
+    currentInput.value = cmdHistory.value[cmdHistoryIdx.value]
+  }
+}
+
+function historyDown() {
+  if (cmdHistoryIdx.value > 0) {
+    cmdHistoryIdx.value--
+    currentInput.value = cmdHistory.value[cmdHistoryIdx.value]
+  } else {
+    cmdHistoryIdx.value = -1
+    currentInput.value = ''
+  }
+}
+
+function tabComplete() {
+  const input = currentInput.value
+  const allCmds = [...Object.keys(COMMANDS), ...Object.keys(PAGE_MAP).map(k => `cd ${k}`)]
+  const matches = allCmds.filter(c => c.startsWith(input) && c !== input)
+  if (matches.length === 1) currentInput.value = matches[0]
+}
+
+function focusInput() {
+  inputRef.value?.focus()
+}
+
+function scrollToBottom() {
+  if (terminalBody.value) {
+    terminalBody.value.scrollTop = terminalBody.value.scrollHeight
+  }
+}
+
+// Boot sequence
+const bootSequence = [
+  { cmd: './ryo --introduce', delay: 400 },
 ]
 
+const introOutput = `<div style="margin-bottom: 0.5rem;">
+  <p style="font-size: 0.65rem; color: var(--text-muted); margin-bottom: 0.25rem; font-family: 'JetBrains Mono', monospace;">NAME</p>
+  <p style="font-family: 'Bricolage Grotesque', sans-serif; font-weight: 800; font-size: clamp(2rem, 5vw, 3.2rem); line-height: 1.1; background: linear-gradient(135deg, #a78bfa, #22d3ee); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">Ryo Suzuki</p>
+</div>
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.2rem 1rem; font-size: 0.75rem; margin-bottom: 0.5rem;">
+  <div><span style="color: var(--text-muted);">ROLE     </span><span style="color: var(--text);">Full Stack Engineer</span></div>
+  <div><span style="color: var(--text-muted);">LOC      </span><span style="color: var(--text);">Tokyo, Japan</span></div>
+  <div><span style="color: var(--text-muted);">ORG      </span><span style="color: var(--amber);">BtoB SaaS (Maritime)</span></div>
+  <div><span style="color: var(--text-muted);">STACK    </span><span style="color: var(--cyan);">AWS · Vue.js · Python</span></div>
+</div>
+<div style="font-size: 0.75rem; margin-bottom: 0.25rem;"><span style="color: var(--text-muted);">INTERESTS </span><span style="color: var(--violet-light);">天体観測 · LoL · Factorio · 旅行</span></div>
+<div style="font-size: 0.75rem; margin-bottom: 0.75rem;"><span style="color: var(--text-muted);">LINKS     </span><a href="https://github.com/ryo-suzukii" target="_blank" style="color: var(--cyan);">github</a> · <a href="https://twitter.com/Hayaa_6211" target="_blank" style="color: var(--cyan);">twitter</a> · <a href="https://zenn.dev/ha" target="_blank" style="color: var(--cyan);">zenn</a></div>
+<div style="font-size: 0.7rem; color: var(--text-dim);">Type <span style="color: var(--cyan);">help</span> for available commands, or <span style="color: var(--cyan);">ls</span> to explore</div>`
+
 onMounted(async () => {
-  await new Promise(r => setTimeout(r, 600))
-  for (let i = 0; i <= command.length; i++) {
-    typedCommand.value = command.slice(0, i)
-    await new Promise(r => setTimeout(r, 55 + Math.random() * 45))
+  booting.value = true
+  await new Promise(r => setTimeout(r, 500))
+
+  // Type the command character by character
+  const cmd = bootSequence[0].cmd
+  let typed = ''
+  history.value.push({ cmd: '', output: null })
+
+  for (let i = 0; i <= cmd.length; i++) {
+    typed = cmd.slice(0, i)
+    history.value[history.value.length - 1].cmd = typed
+    await new Promise(r => setTimeout(r, 55 + Math.random() * 35))
   }
-  commandDone.value = true
-  await new Promise(r => setTimeout(r, 300))
-  showOutput.value = true
+
+  await new Promise(r => setTimeout(r, 250))
+  history.value[history.value.length - 1].output = introOutput
+
+  await nextTick()
+  scrollToBottom()
+  booting.value = false
+  await nextTick()
+  inputRef.value?.focus()
 })
 
+// Three.js starfield
 let renderer, scene, camera, stars, animId
 
 onMounted(() => {
@@ -203,16 +328,15 @@ onMounted(() => {
   stars = new THREE.Points(geo, mat)
   scene.add(stars)
 
-  let frameCount = 0
+  let fc = 0
   function animate() {
     animId = requestAnimationFrame(animate)
-    frameCount++
+    fc++
     stars.rotation.y += 0.00008
     stars.rotation.x += 0.00004
-    if (frameCount % 2 === 0) renderer.render(scene, camera)
+    if (fc % 2 === 0) renderer.render(scene, camera)
   }
   animate()
-
   window.addEventListener('resize', onResize)
 })
 
@@ -231,14 +355,6 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-.output-enter-active {
-  transition: opacity 0.5s ease, transform 0.5s ease;
-}
-.output-enter-from {
-  opacity: 0;
-  transform: translateY(12px);
-}
-
 .bento-card {
   transition: transform 0.3s ease, box-shadow 0.3s ease;
 }

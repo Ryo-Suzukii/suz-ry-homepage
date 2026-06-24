@@ -23,10 +23,10 @@ export const careerData = [
     id: 3,
     period: '2024 - Present',
     role: 'Full Stack Engineer',
-    company: 'WNI (Weathernews Inc.)',
+    company: 'BtoB SaaS',
     type: 'work',
-    description: '海運向けGHG排出規制サービスの開発。フロントエンドからバックエンド・インフラまで幅広く担当。AWSを中心にサーバーレスアーキテクチャを設計・実装。',
-    tags: ['Vue.js', 'Python', 'FastAPI', 'AWS', 'Docker'],
+    description: '海運向けBtoB SaaSアプリにてビジネスデータ分析基盤の構築、およびそれを活用したAI Agentの開発を担当。フロントエンドからインフラまでフルスタックで関与。AWSサーバーレスアーキテクチャを設計・実装。',
+    tags: ['Vue.js', 'Python', 'FastAPI', 'AWS', 'AI Agent'],
     icon: '⚡',
   },
 ]

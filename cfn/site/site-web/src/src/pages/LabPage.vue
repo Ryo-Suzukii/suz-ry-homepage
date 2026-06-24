@@ -7,7 +7,7 @@
     <div class="fixed inset-0 pointer-events-none" style="z-index: 1; background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.03) 2px, rgba(0,0,0,0.03) 4px);" />
 
     <!-- Content -->
-    <div class="relative pt-24 pb-20 px-6" style="z-index: 2;">
+    <div class="relative pt-28 pb-20 px-6" style="z-index: 2;">
       <div class="max-w-4xl mx-auto">
 
         <!-- System boot sequence -->
@@ -220,10 +220,10 @@ onMounted(async () => {
 // Scroll reveal
 onMounted(() => {
   const observer = new IntersectionObserver(
-    entries => entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible') }),
-    { threshold: 0.1 }
+    entries => entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('visible'); observer.unobserve(e.target) } }),
+    { threshold: 0.05, rootMargin: '0px 0px -20px 0px' }
   )
-  document.querySelectorAll('.reveal').forEach(el => observer.observe(el))
+  requestAnimationFrame(() => document.querySelectorAll('.reveal').forEach(el => observer.observe(el)))
 })
 
 // Three.js — flowing particle field

@@ -3,9 +3,9 @@ export const setupData = {
     {
       id: 1,
       name: 'MacBook Pro 16"',
-      spec: 'M3 Pro / 36GB RAM',
+      spec: 'Apple M5 / 24GB RAM',
       category: 'Computer',
-      description: 'メイン開発機。M3 Proのパワーは圧倒的。バッテリーも持つしこれ一台で何でも完結する。',
+      description: 'メイン開発機。M5のパワーは圧倒的でビルドも爆速。バッテリーも長持ちでこれ一台で何でも完結する。',
       emoji: '💻',
       color: '#64748b',
     },
