@@ -1,30 +1,10 @@
 <script setup>
-import { watch } from "vue"
-
-import { useAuth } from "./plugins/auth/index.js"
-import { useStore } from "./store/app.js"
-
-const { isLoading } = useAuth()
-const store = useStore()
-
-watch(isLoading, (value) => store.setLoading(value))
+import NavBar from './components/NavBar.vue'
 </script>
 
 <template>
-  <div class="app-container">
-    <router-view class="h-screen w-screen" />
+  <div style="background: var(--bg); min-height: 100vh;">
+    <NavBar />
+    <RouterView />
   </div>
 </template>
-
-<style>
-.app-container {
-  background-color: #000000;
-  min-height: 100vh;
-  width: 100vw;
-}
-
-html, body {
-  background-color: #000000 !important;
-  color: white;
-}
-</style>
