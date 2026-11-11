@@ -60,8 +60,8 @@ function camera() {
   const scrollable = document.documentElement.scrollHeight - window.innerHeight
   const progress = scrollable > 0 ? Math.min(1, Math.max(0, window.scrollY / scrollable)) : 0
   const eased = progress * progress * (3 - 2 * progress)
-  // ページの先頭では地平線が画面の下のほうに見え、読み進めるほど空を見上げていく
-  const low = 2 * Math.atan(0.86 * tanHalf)
+  // ページの先頭では湖と地平線が画面の下のほうに見え、読み進めるほど空を見上げていく
+  const low = 2 * Math.atan(0.5 * tanHalf)
   const high = 1.12
   const alt = Math.min(1.45, Math.max(low - 0.12, low + (high - low) * eased + dragAlt + parallax.y))
   return { az: baseAz + dragAz + parallax.x, alt, tanHalf }
@@ -103,7 +103,7 @@ function frame(now) {
 
   const date = shownDate()
   const ease = adapt * adapt * (3 - 2 * adapt)
-  sky.render({ date, ...camera(), adapt: ease, lines, twinkle: reduced ? 0 : 1, time: clock, meteor })
+  sky.render({ date, ...camera(), anchorAz: baseAz, adapt: ease, lines, twinkle: reduced ? 0 : 1, time: clock, meteor })
 
   if (clock - infoAt > 0.25) {
     infoAt = clock
