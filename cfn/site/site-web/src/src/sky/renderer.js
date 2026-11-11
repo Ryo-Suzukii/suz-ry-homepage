@@ -16,6 +16,10 @@ const RIDGE_GLSL = `
 float ridge(float az) {
   return max(0.006, 0.026 + 0.017 * sin(az * 3.0 + 0.5) + 0.011 * sin(az * 7.0 + 2.1)
     + 0.006 * sin(az * 13.0 + 4.0) + 0.003 * sin(az * 29.0 + 1.0) + 0.0015 * sin(az * 61.0 + 3.0));
+}
+// 手前の岸。水平線からこの角度より下は地面
+float bank(float az) {
+  return 0.118 + 0.016 * sin(az * 2.0 + 1.0) + 0.006 * sin(az * 9.0 + 0.3);
 }`
 
 const QUAD_VS = `
@@ -89,37 +93,54 @@ const SKY_FS = `
 precision highp float;
 varying vec2 vPos;
 uniform vec2 uProj;
-uniform mat3 uCamToEq;
+uniform mat3 uHorToEq;
 uniform mat3 uCamToHor;
 uniform sampler2D uMilkyWay;
 uniform float uMilkyWayGain;
+uniform float uTime;
 ${RIDGE_GLSL}
 float dither(vec2 p) {
   return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453) - 0.5;
+}
+// 地平座標の向きに見える空 (稜線より下は山影)
+vec3 skyAt(vec3 h) {
+  float alt = asin(clamp(h.z, -1.0, 1.0));
+  float az = atan(h.x, h.y);
+  float up = clamp(alt / 1.5707963, 0.0, 1.0);
+  vec3 sky = mix(vec3(0.040, 0.066, 0.122), vec3(0.007, 0.011, 0.026), pow(up, 0.42));
+  // 大気光
+  sky += vec3(0.016, 0.050, 0.058) * exp(-max(alt, 0.0) / 0.2);
+  // 地平線ぎわの、遠い街あかり
+  float dome = exp(-max(alt, 0.0) / 0.085) * (0.62 + 0.38 * sin(az + 2.0));
+  sky += vec3(0.235, 0.125, 0.06) * dome;
+
+  vec3 e = uHorToEq * h;
+  vec2 uv = vec2(atan(e.y, e.x) / 6.2831853, asin(clamp(e.z, -1.0, 1.0)) / 3.14159265 + 0.5);
+  vec3 mw = texture2D(uMilkyWay, uv).rgb;
+  sky += mw * mw * smoothstep(0.0, 0.4, alt) * uMilkyWayGain;
+
+  float rd = ridge(az);
+  return mix(sky, vec3(0.004, 0.006, 0.010), smoothstep(rd + 0.0015, rd - 0.0015, alt));
 }
 void main() {
   vec2 p = vPos * uProj;
   float r2 = dot(p, p);
   vec3 c = vec3(4.0 * p, 4.0 - r2) / (4.0 + r2);
   vec3 h = uCamToHor * c;
-  vec3 e = uCamToEq * c;
   float alt = asin(clamp(h.z, -1.0, 1.0));
   float az = atan(h.x, h.y);
-
-  float up = clamp(alt / 1.5707963, 0.0, 1.0);
-  vec3 sky = mix(vec3(0.036, 0.058, 0.108), vec3(0.007, 0.011, 0.026), pow(up, 0.42));
-  // 地平線ぎわの、遠い街あかり
-  float dome = exp(-max(alt, 0.0) / 0.075) * (0.55 + 0.45 * sin(az + 2.0));
-  sky += vec3(0.105, 0.066, 0.036) * dome;
-
-  vec2 uv = vec2(atan(e.y, e.x) / 6.2831853, asin(clamp(e.z, -1.0, 1.0)) / 3.14159265 + 0.5);
-  vec3 mw = texture2D(uMilkyWay, uv).rgb;
-  sky += mw * mw * smoothstep(0.0, 0.4, alt) * uMilkyWayGain;
-
-  float rd = ridge(az);
-  float ground = smoothstep(rd + 0.0015, rd - 0.0015, alt);
-  vec3 earth = vec3(0.004, 0.006, 0.010) + vec3(0.012, 0.014, 0.020) * exp(min(alt, 0.0) * 9.0) * 0.4;
-  vec3 col = mix(sky, earth, ground);
+  vec3 col;
+  if (alt >= 0.0) {
+    col = skyAt(h);
+  } else {
+    // 湖面。空を上下に映し、さざ波でわずかに揺らす
+    float depth = -alt;
+    float ripple = sin(depth * 620.0 + uTime * 0.8 + az * 24.0) * sin(depth * 170.0 - uTime * 0.5 + az * 9.0);
+    vec3 mirrored = normalize(vec3(h.xy, -h.z + 0.0035 * ripple * smoothstep(0.0, 0.06, depth)));
+    col = skyAt(mirrored) * 0.82 + vec3(0.003, 0.006, 0.011);
+    float b = bank(az);
+    col = mix(col, vec3(0.003, 0.004, 0.007), smoothstep(b - 0.0015, b + 0.0015, depth));
+  }
   col += dither(gl_FragCoord.xy) / 255.0;
   gl_FragColor = vec4(col, 1.0);
 }`
@@ -128,9 +149,10 @@ const STAR_VS = `
 attribute vec3 aDir;
 attribute vec4 aColor; // rgb + 等級
 attribute float aSeed; // 負の値は瞬かない (惑星)
-uniform mat3 uEqToCam;
+uniform mat3 uHorToCam;
 uniform mat3 uEqToHor;
 uniform vec2 uInvProj;
+uniform float uMirror; // 1 のとき湖面に映った像を描く
 uniform float uDpr;
 uniform float uTime;
 uniform float uLimit;
@@ -141,11 +163,15 @@ varying float vCore;
 varying float vBright;
 ${RIDGE_GLSL}
 void main() {
-  vec3 c = uEqToCam * aDir;
   vec3 h = uEqToHor * aDir;
   float alt = asin(clamp(h.z, -1.0, 1.0));
   float az = atan(h.x, h.y);
-  bool visible = alt > ridge(az) + 0.002 && c.z > -0.5;
+  vec3 seen = h;
+  if (uMirror > 0.5) {
+    seen = normalize(vec3(h.xy, -h.z + 0.003 * sin(uTime * 1.3 + aSeed * 60.0)));
+  }
+  vec3 c = uHorToCam * seen;
+  bool visible = alt > ridge(az) + 0.002 && c.z > -0.5 && (uMirror < 0.5 || alt < bank(az) - 0.004);
   vec2 p = 2.0 * c.xy / (1.0 + c.z) * uInvProj;
 
   float mag = aColor.a;
@@ -159,6 +185,7 @@ void main() {
   float wave = sin(uTime * (1.6 + aSeed * 4.0) + aSeed * 97.0) * sin(uTime * (0.7 + aSeed * 2.3) + aSeed * 31.0);
   alpha *= 1.0 + uTwinkle * step(0.0, aSeed) * (0.1 + 0.55 * low) * wave;
   alpha *= mix(0.3, 1.0, smoothstep(0.0, 0.32, alt));
+  alpha *= mix(1.0, 0.72, uMirror);
 
   vBright = smoothstep(2.6, -1.0, mag);
   float spread = 1.0 + 3.2 * vBright;
@@ -226,6 +253,10 @@ function ridgeAt(az) {
       0.003 * Math.sin(az * 29 + 1) +
       0.0015 * Math.sin(az * 61 + 3),
   )
+}
+
+function bankAt(az) {
+  return 0.118 + 0.016 * Math.sin(az * 2 + 1) + 0.006 * Math.sin(az * 9 + 0.3)
 }
 
 export function createSky(glCanvas, overlayCanvas, skydata) {
@@ -411,6 +442,75 @@ export function createSky(glCanvas, overlayCanvas, skydata) {
     }
 
     if (state.meteor) drawMeteor(state.meteor)
+    drawStargazer(state)
+  }
+
+  // 岸に立って望遠鏡をのぞく人影。方位は固定なので、見渡すと画面の外に出ていく。
+  function drawStargazer(state) {
+    const az = state.anchorAz + 0.3
+    const feet = -bankAt(az) + 0.003
+    const c = apply3(view.horToCam, [Math.sin(az) * Math.cos(feet), Math.cos(az) * Math.cos(feet), Math.sin(feet)])
+    if (c[2] < 0.2) return
+    const k = 2 / (1 + c[2])
+    const x = (((c[0] * k) / view.projX) * 0.5 + 0.5) * width
+    const y = (0.5 - ((c[1] * k) / view.projY) * 0.5) * height
+    if (y > height + 80 || x < -80 || x > width + 80) return
+    const u = (height / (2 * view.projY)) * 0.075 // 身長にあたる長さ (px)
+
+    ctx.save()
+    ctx.translate(x, y)
+    ctx.fillStyle = "#020306"
+    ctx.strokeStyle = "#020306"
+    ctx.lineCap = "round"
+    ctx.lineJoin = "round"
+
+    // 三脚と鏡筒
+    ctx.lineWidth = Math.max(1.2, u * 0.035)
+    ctx.beginPath()
+    for (const foot of [-0.3, 0.02, 0.26]) {
+      ctx.moveTo(u * 0.52, -u * 0.62)
+      ctx.lineTo(u * (0.52 + foot), 0)
+    }
+    ctx.stroke()
+    ctx.lineWidth = Math.max(2.5, u * 0.11)
+    ctx.beginPath()
+    ctx.moveTo(u * 0.3, -u * 0.5)
+    ctx.lineTo(u * 0.92, -u * 1.02)
+    ctx.stroke()
+
+    // 人
+    ctx.beginPath()
+    ctx.arc(u * 0.09, -u * 0.72, u * 0.085, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.lineWidth = Math.max(2.5, u * 0.15)
+    ctx.beginPath()
+    ctx.moveTo(u * 0.04, -u * 0.6)
+    ctx.lineTo(-u * 0.02, -u * 0.3)
+    ctx.stroke()
+    ctx.lineWidth = Math.max(1.8, u * 0.085)
+    ctx.beginPath()
+    ctx.moveTo(-u * 0.02, -u * 0.32)
+    ctx.lineTo(-u * 0.08, 0)
+    ctx.moveTo(-u * 0.02, -u * 0.32)
+    ctx.lineTo(u * 0.07, 0)
+    ctx.moveTo(u * 0.04, -u * 0.55)
+    ctx.lineTo(u * 0.27, -u * 0.5)
+    ctx.stroke()
+
+    // 足もとの赤いライト。暗さに慣れた目を守るため、観測では赤い光を使う
+    const glow = ctx.createRadialGradient(-u * 0.3, -u * 0.04, 0, -u * 0.3, -u * 0.04, u * 0.5)
+    glow.addColorStop(0, "rgba(255, 70, 46, 0.55)")
+    glow.addColorStop(0.15, "rgba(255, 70, 46, 0.16)")
+    glow.addColorStop(1, "rgba(255, 70, 46, 0)")
+    ctx.fillStyle = glow
+    ctx.beginPath()
+    ctx.arc(-u * 0.3, -u * 0.04, u * 0.5, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.fillStyle = "rgb(255, 120, 96)"
+    ctx.beginPath()
+    ctx.arc(-u * 0.3, -u * 0.04, Math.max(1, u * 0.022), 0, Math.PI * 2)
+    ctx.fill()
+    ctx.restore()
   }
 
   function drawMoon(at, state) {
@@ -472,7 +572,7 @@ export function createSky(glCanvas, overlayCanvas, skydata) {
     ctx.stroke()
   }
 
-  // state: { date, az, alt, tanHalf, adapt (0-1), lines (0-1), twinkle (0|1), time (秒), meteor }
+  // state: { date, az, alt, anchorAz, tanHalf, adapt (0-1), lines (0-1), twinkle (0|1), time (秒), meteor }
   function render(state) {
     updateBodies(state.date)
     const lst = localSiderealTime(state.date)
@@ -481,7 +581,7 @@ export function createSky(glCanvas, overlayCanvas, skydata) {
     const eqToCam = mul3(horToCam, eqToHor)
     const projY = 2 * state.tanHalf
     const projX = projY * (width / height)
-    view = { eqToHor, eqToCam, projX, projY }
+    view = { eqToHor, eqToCam, horToCam, projX, projY }
 
     gl.viewport(0, 0, glCanvas.width, glCanvas.height)
     gl.disable(gl.BLEND)
@@ -493,7 +593,8 @@ export function createSky(glCanvas, overlayCanvas, skydata) {
     gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0)
     gl.uniform2f(skyProg.uniforms.uProj, projX, projY)
     // 行優先の配列をそのまま渡すと GL 側では転置 (= 逆回転) になる
-    gl.uniformMatrix3fv(skyProg.uniforms.uCamToEq, false, eqToCam)
+    gl.uniformMatrix3fv(skyProg.uniforms.uHorToEq, false, eqToHor)
+    gl.uniform1f(skyProg.uniforms.uTime, state.time)
     gl.uniformMatrix3fv(skyProg.uniforms.uCamToHor, false, horToCam)
     gl.uniform1f(skyProg.uniforms.uMilkyWayGain, Math.min(1, Math.max(0, (state.adapt - 0.3) / 0.7)))
     gl.activeTexture(gl.TEXTURE0)
@@ -504,21 +605,25 @@ export function createSky(glCanvas, overlayCanvas, skydata) {
     gl.enable(gl.BLEND)
     gl.blendFunc(gl.ONE, gl.ONE)
     gl.useProgram(starProg.p)
-    gl.uniformMatrix3fv(starProg.uniforms.uEqToCam, false, transpose3(eqToCam))
+    gl.uniformMatrix3fv(starProg.uniforms.uHorToCam, false, transpose3(horToCam))
     gl.uniformMatrix3fv(starProg.uniforms.uEqToHor, false, transpose3(eqToHor))
     gl.uniform2f(starProg.uniforms.uInvProj, 1 / projX, 1 / projY)
     gl.uniform1f(starProg.uniforms.uDpr, dpr)
     gl.uniform1f(starProg.uniforms.uTime, state.time)
     gl.uniform1f(starProg.uniforms.uLimit, 1.2 + 8.3 * state.adapt)
     gl.uniform1f(starProg.uniforms.uTwinkle, state.twinkle)
-    if (starCount) {
-      gl.bindBuffer(gl.ARRAY_BUFFER, starBuffer)
+    // 1 回目は空、2 回目は湖面に映った像
+    for (const mirror of [0, 1]) {
+      gl.uniform1f(starProg.uniforms.uMirror, mirror)
+      if (starCount) {
+        gl.bindBuffer(gl.ARRAY_BUFFER, starBuffer)
+        bindStarAttribs()
+        gl.drawArrays(gl.POINTS, 0, starCount)
+      }
+      gl.bindBuffer(gl.ARRAY_BUFFER, planetBuffer)
       bindStarAttribs()
-      gl.drawArrays(gl.POINTS, 0, starCount)
+      gl.drawArrays(gl.POINTS, 0, 5)
     }
-    gl.bindBuffer(gl.ARRAY_BUFFER, planetBuffer)
-    bindStarAttribs()
-    gl.drawArrays(gl.POINTS, 0, 5)
 
     drawOverlay(state)
   }
