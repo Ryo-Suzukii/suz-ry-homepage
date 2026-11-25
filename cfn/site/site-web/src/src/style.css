@@ -100,21 +100,15 @@ a:hover {
 }
 
 .hero__lead {
-  margin: 2.2rem 0 0;
-  font-size: clamp(1.15rem, 2.2vw, 1.6rem);
+  margin: 3rem 0 0;
+  font-family: var(--mincho);
+  font-size: clamp(1.2rem, 2.3vw, 1.75rem);
   font-weight: 500;
   line-height: 1.8;
+  letter-spacing: 0.12em;
+  text-indent: 0.12em;
+  word-break: keep-all;
   text-shadow: 0 0 24px var(--night);
-}
-
-.hero__hint {
-  margin: 1.4rem 0 0;
-  max-width: 26em;
-  font-size: 0.85rem;
-  font-weight: 400;
-  line-height: 1.8;
-  color: var(--dusk);
-  text-shadow: 0 0 16px var(--night);
 }
 
 @keyframes arrive {

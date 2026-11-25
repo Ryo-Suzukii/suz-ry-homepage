@@ -242,6 +242,7 @@ onBeforeUnmount(() => {
     <p class="deck__readout">
       <span class="deck__time">{{ info.time }}</span>
       <span>北緯35°・東経139°から見た{{ shifted ? "空" : "いまの空" }}</span>
+      <span class="deck__hint">ドラッグで見渡せます</span>
       <span v-if="note" class="deck__note">{{ note }}</span>
     </p>
     <div class="deck__buttons">
@@ -387,7 +388,8 @@ onBeforeUnmount(() => {
     font-size: 0.75rem;
   }
 
-  .deck__note {
+  .deck__note,
+  .deck__hint {
     display: none;
   }
 }

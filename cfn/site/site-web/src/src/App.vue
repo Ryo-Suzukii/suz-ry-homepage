@@ -10,8 +10,7 @@ import { games, links, stack, tools, works } from "./data/profile.js"
     <header class="hero">
       <h1 class="hero__name">Ryo Suzuki</h1>
       <p class="hero__handle">hayaa</p>
-      <p class="hero__lead">AIエージェントをつくるエンジニアです。<wbr />星空が好きです。</p>
-      <p class="hero__hint">下へ読み進めると、少しずつ空を見上げていきます。<br />ドラッグで見渡せます。</p>
+      <p class="hero__lead">船の世界で、<wbr />AIエージェントをつくっています。</p>
     </header>
 
     <section class="block">
